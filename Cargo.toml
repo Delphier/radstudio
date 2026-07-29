@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+comfy-table = "7.2.2"
+strum = { version = "0.28.0", features = ["derive"] }
+windows-registry = "0.6.1"
