@@ -45,12 +45,41 @@ impl Architecture {
 
 pub type Architectures = BTreeSet<Architecture>;
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
+pub enum CommandLineTool {
+    DCC32,
+    DCC64,
+    BCC64X,
+    DCCARM64EC,
+}
+
+impl CommandLineTool {
+    fn exe_path(&self, product_info: &ProductInfo, arch: &Architecture) -> PathBuf {
+        product_info.bin_dir(arch).join(format!("{self:?}.exe"))
+    }
+}
+
+pub type CommandLineTools = BTreeSet<CommandLineTool>;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
 pub enum Platform {
     Win32,
     Win64,
     Win64x,
     WinARM64EC,
 }
+
+impl Platform {
+    fn command_line_tool(&self) -> CommandLineTool {
+        match self {
+            Platform::Win32 => CommandLineTool::DCC32,
+            Platform::Win64 => CommandLineTool::DCC64,
+            Platform::Win64x => CommandLineTool::BCC64X,
+            Platform::WinARM64EC => CommandLineTool::DCCARM64EC,
+        }
+    }
+}
+
 pub type Platforms = BTreeSet<Platform>;
 
 #[derive(Debug)]
@@ -114,6 +143,33 @@ impl ProductInfo {
         self.version().parse::<f64>().unwrap_or_default() as u32
     }
 
+    pub fn compiler_version(&self) -> String {
+        match self.version_number() {
+            n @ (2..=4 | 6..=12) => format!("{}.0", n + 14),
+            5 => "18.5".to_string(),
+            n @ 14..=23 => format!("{}.0", n + 13),
+            37.. => self.version().to_string(),
+            _ => "".to_string(),
+        }
+    }
+
+    pub fn compiler_version_number(&self) -> u32 {
+        (self.compiler_version().parse::<f64>().unwrap_or_default() * 10.0) as u32
+    }
+
+    pub fn package_version(&self) -> String {
+        match self.version_number() {
+            n @ (2..=6 | 14..=23) => (n + 6).to_string(),
+            n @ 7..=12 => (n + 7).to_string(),
+            n @ (37..) => n.to_string(),
+            _ => "".to_string(),
+        }
+    }
+
+    pub fn package_version_number(&self) -> u32 {
+        self.package_version().parse::<u32>().unwrap_or_default() * 10
+    }
+
     pub fn product_family(&self) -> &'static str {
         match self.version_number() {
             ..=3 => "Delphi",
@@ -163,7 +219,11 @@ impl ProductInfo {
     }
 
     pub fn root_dir(&self) -> PathBuf {
-        self.globals.get("RootDir").cloned().unwrap_or_default().into()
+        self.globals
+            .get("RootDir")
+            .cloned()
+            .unwrap_or_default()
+            .into()
     }
 
     pub fn personalities(&self) -> &Personalities {
@@ -187,6 +247,23 @@ impl ProductInfo {
             .unwrap_or_default()
             .into()
     }
+
+    pub fn command_line_tools(&self, arch: &Architecture) -> CommandLineTools {
+        CommandLineTool::iter()
+            .filter_map(|c| c.exe_path(self, arch).exists().then_some(c))
+            .collect()
+    }
+
+    pub fn platforms(self, arch: &Architecture) -> Platforms {
+        let command_line_tools = self.command_line_tools(arch);
+        Platform::iter()
+            .filter_map(|p| {
+                command_line_tools
+                    .contains(&p.command_line_tool())
+                    .then_some(p)
+            })
+            .collect()
+    }
 }
 
 impl Display for ProductInfo {
@@ -197,17 +274,49 @@ impl Display for ProductInfo {
             .set_header(vec!["Property", "Type", "Value"])
             .add_row(vec!["Known", "Boolean", &self.is_known().to_string()])
             .add_row(vec!["Version", "String", self.version()])
-            .add_row(vec!["Version Number", "UInt", &self.version_number().to_string()])
+            .add_row(vec![
+                "Version Number",
+                "UInt",
+                &self.version_number().to_string(),
+            ])
+            .add_row(vec!["Compiler Version", "String", &self.compiler_version()])
+            .add_row(vec![
+                "Compiler Version Number",
+                "UInt",
+                &self.compiler_version_number().to_string(),
+            ])
+            .add_row(vec!["Package Version", "String", &self.package_version()])
+            .add_row(vec![
+                "Package Version Number",
+                "UInt",
+                &self.package_version_number().to_string(),
+            ])
             .add_row(vec!["Product Family", "String", self.product_family()])
             .add_row(vec!["Product Version", "String", &self.product_version()])
             .add_row(vec!["Product Name", "String", &self.product_name()])
-            .add_row(vec!["Update Number", "UInt", &self.update_number().to_string()])
+            .add_row(vec![
+                "Update Number",
+                "UInt",
+                &self.update_number().to_string(),
+            ])
             .add_row(vec!["Name", "String", &self.name()])
             .add_row(vec!["Code Name", "String", self.code_name()])
             .add_row(vec!["Full Name", "String", &self.full_name()])
-            .add_row(vec!["Root Dir", "String", &self.root_dir().display().to_string()])
-            .add_row(vec!["Personalities", "Set", &format!("{:?}", self.personalities())])
-            .add_row(vec!["Architectures", "Set", &format!("{:?}", self.architectures())]);
+            .add_row(vec![
+                "Root Dir",
+                "String",
+                &self.root_dir().display().to_string(),
+            ])
+            .add_row(vec![
+                "Personalities",
+                "Set",
+                &format!("{:?}", self.personalities()),
+            ])
+            .add_row(vec![
+                "Architectures",
+                "Set",
+                &format!("{:?}", self.architectures()),
+            ]);
 
         for arch in self.architectures() {
             let arch_name = format!("{:?}: ", arch);
@@ -221,6 +330,11 @@ impl Display for ProductInfo {
                     &format!("{arch_name}App"),
                     "Sring",
                     &self.app(&arch).display().to_string(),
+                ])
+                .add_row(vec![
+                    &format!("{arch_name}Command Line Tools"),
+                    "Set",
+                    &format!("{:?}", self.command_line_tools(&arch)),
                 ]);
         }
         writeln!(f, "{table}")
