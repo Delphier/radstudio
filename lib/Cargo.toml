@@ -1,0 +1,9 @@
+[package]
+name = "radstudio"
+version = "0.1.1"
+edition.workspace = true
+
+[dependencies]
+comfy-table = "7.2.2"
+strum = { version = "0.28.0", features = ["derive"] }
+windows-registry.workspace = true

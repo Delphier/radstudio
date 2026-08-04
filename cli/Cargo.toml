@@ -1,0 +1,15 @@
+[package]
+name = "radstudio-cli"
+version = "0.1.1"
+edition.workspace = true
+
+[[bin]]
+name = "radstudio"
+path = "src/main.rs"
+
+[dependencies]
+radstudio = {path = "../lib"}
+anyhow = "1.0.104"
+clap = { version = "4.6.4", features = ["derive"] }
+clap-cargo = "0.18.3"
+windows-registry.workspace = true
