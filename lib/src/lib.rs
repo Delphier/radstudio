@@ -360,7 +360,44 @@ impl Installation {
     }
 }
 
-type Installations = Vec<Installation>;
+pub struct Installations {
+    items: Vec<Installation>,
+}
+
+impl Installations {
+    fn new() -> Self {
+        Self { items: vec![] }
+    }
+
+    fn push(&mut self, value: Installation) {
+        self.items.push(value);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Installation> {
+        self.items.iter()
+    }
+
+    pub fn find_by_name(&self, name: &str) -> Option<&Installation> {
+        self.items.iter().find(|i| {
+            i.product_info.product_name().eq_ignore_ascii_case(name)
+                || i.product_info().name().eq_ignore_ascii_case(name)
+                || i.product_info().code_name().eq_ignore_ascii_case(name)
+                || i.product_info().full_name().eq_ignore_ascii_case(name)
+                || i.product_info()
+                    .product_version()
+                    .eq_ignore_ascii_case(name)
+                || i.product_info()
+                    .name()
+                    .replace(i.product_info().product_family(), "")
+                    .trim()
+                    .eq_ignore_ascii_case(name)
+        })
+    }
+
+    pub fn latest(&self) -> Option<&Installation> {
+        self.items.last()
+    }
+}
 
 pub fn find() -> Result<Installations> {
     let mut installs = Installations::new();
@@ -379,5 +416,10 @@ pub fn find() -> Result<Installations> {
             }
         }
     }
+    installs.items.sort_by(|a, b| {
+        a.product_info()
+            .version_number()
+            .cmp(&b.product_info().version_number())
+    });
     Ok(installs)
 }
