@@ -6,4 +6,5 @@ resolver = "3"
 edition = "2024"
 
 [workspace.dependencies]
+clap = { version = "4.6.6", features = ["derive"] }
 windows-registry = "0.6.1"

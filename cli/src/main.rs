@@ -1,14 +1,14 @@
 mod selfcmd;
 
 use anyhow::Context;
-use clap::Parser;
-use clap::Subcommand;
+use clap::{Parser, Subcommand};
+use radstudio::{Architecture, Installation, Installations, Platform};
 use std::sync::OnceLock;
 
 const APP_NAME: &'static str = "RAD Studio CLI";
 
-static INSTALLATIONS: OnceLock<radstudio::Installations> = OnceLock::new();
-fn installations() -> &'static radstudio::Installations {
+static INSTALLATIONS: OnceLock<Installations> = OnceLock::new();
+fn installations() -> &'static Installations {
     INSTALLATIONS.get_or_init(|| radstudio::find().unwrap())
 }
 
@@ -40,8 +40,23 @@ struct App {
     /// - Product name: "RAD Studio 13" or "RAD Studio 13.1"
     /// - Product codename: Florence, Rio, Berlin
     /// - Product version: 13, 12, XE2, XE8
+    ///
+    /// If omitted, the latest installed version is used.
     #[arg(verbatim_doc_comment, value_parser = parse_name)]
-    name: Option<&'static radstudio::Installation>,
+    name: Option<&'static Installation>,
+    /// Specify the toolchain or IDE architecture
+    #[arg(
+        short,
+        long,
+        alias = "arch",
+        value_name = "ARCH",
+        value_enum,
+        ignore_case = true
+    )]
+    architecture: Option<Architecture>,
+    /// Specify the target platform
+    #[arg(short, long, value_enum, ignore_case = true)]
+    platform: Option<Platform>,
     #[command(subcommand)]
     subcmd: Option<Cmd>,
 }
@@ -57,7 +72,7 @@ enum Cmd {
     },
 }
 
-fn print_info(installation: Option<&'static radstudio::Installation>) {
+fn print_info(installation: Option<&'static Installation>) {
     match installation {
         Some(i) => {
             println!("{}", i.product_info().full_name());
@@ -72,7 +87,7 @@ fn print_info(installation: Option<&'static radstudio::Installation>) {
     }
 }
 
-fn parse_name(name: &str) -> Result<&'static radstudio::Installation, String> {
+fn parse_name(name: &str) -> Result<&'static Installation, String> {
     installations()
         .find_by_name(name)
         .ok_or("no installed RAD Studio matched".to_string())

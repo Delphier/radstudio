@@ -19,9 +19,14 @@ pub enum Personality {
 
 pub type Personalities = BTreeSet<Personality>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, clap::ValueEnum)]
+#[value(rename_all = "verbatim")]
 pub enum Architecture {
+    /// aliases x86, 32bit, 32-bit
+    #[value(aliases=["x86", "32bit", "32-bit"])]
     IntelX86,
+    /// aliases x64, 64bit, 64-bit
+    #[value(aliases=["x64", "64bit", "64-bit"])]
     IntelX64,
 }
 
@@ -59,7 +64,8 @@ impl CommandLineTool {
 
 pub type CommandLineTools = BTreeSet<CommandLineTool>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, clap::ValueEnum)]
+#[value(rename_all = "verbatim")]
 pub enum Platform {
     Win32,
     Win64,
