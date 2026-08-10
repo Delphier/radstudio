@@ -1,15 +1,16 @@
-use crate::consts::VersionInfo;
+use crate::{consts, msbuild};
 use comfy_table::Table;
 use std::{
     collections::{BTreeSet, HashMap},
     fmt::Display,
+    os::windows::process::CommandExt,
     path::PathBuf,
     str::FromStr,
 };
 use strum::IntoEnumIterator;
 use windows_registry::{CURRENT_USER, Key, Result};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
 pub enum Personality {
     #[strum(serialize = "Delphi.Win32", to_string = "Delphi")]
     Delphi,
@@ -23,10 +24,10 @@ pub type Personalities = BTreeSet<Personality>;
 #[value(rename_all = "verbatim")]
 pub enum Architecture {
     /// aliases x86, 32bit, 32-bit
-    #[value(aliases=["x86", "32bit", "32-bit"])]
+    #[value(aliases = ["x86", "32bit", "32-bit"])]
     IntelX86,
     /// aliases x64, 64bit, 64-bit
-    #[value(aliases=["x64", "64bit", "64-bit"])]
+    #[value(aliases = ["x64", "64bit", "64-bit"])]
     IntelX64,
 }
 
@@ -48,12 +49,21 @@ impl Architecture {
 
 pub type Architectures = BTreeSet<Architecture>;
 
+// Delphi toolchains: https://docwiki.embarcadero.com/RADStudio/en/Delphi_Toolchains
+// C++Builder toolchains: https://docwiki.embarcadero.com/RADStudio/en/C++_Toolchains
+// Command-Line Utilities Index: https://docwiki.embarcadero.com/RADStudio/en/Command-Line_Utilities_Index
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
 pub enum CommandLineTool {
     DCC32,
     DCC64,
     BCC64X,
     DCCARM64EC,
+    DCCOSX64,
+    DCCOSXARM64,
+    DCCLINUX64,
+    DCCAARM,
+    DCCAARM64,
+    DCCIOSARM64,
 }
 
 impl CommandLineTool {
@@ -67,10 +77,26 @@ pub type CommandLineTools = BTreeSet<CommandLineTool>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, clap::ValueEnum)]
 #[value(rename_all = "verbatim")]
 pub enum Platform {
+    /// 32-bit Intel Windows
     Win32,
+    /// 64-bit Intel Windows
     Win64,
+    /// 64-bit Intel Windows (Modern), only available for C++ Builder
     Win64x,
+    /// 64-bit Arm64EC Windows
     WinARM64EC,
+    /// 64-bit Intel macOS
+    OSX64,
+    /// 64-bit ARM macOS
+    OSXARM64,
+    /// 64-bit Intel Linux
+    Linux64,
+    /// 32-bit Android
+    Android32,
+    /// 64-bit Android
+    Android64,
+    /// 64-bit iOS
+    IOSDevice64,
 }
 
 impl Platform {
@@ -80,6 +106,12 @@ impl Platform {
             Platform::Win64 => CommandLineTool::DCC64,
             Platform::Win64x => CommandLineTool::BCC64X,
             Platform::WinARM64EC => CommandLineTool::DCCARM64EC,
+            Platform::OSX64 => CommandLineTool::DCCOSX64,
+            Platform::OSXARM64 => CommandLineTool::DCCOSXARM64,
+            Platform::Linux64 => CommandLineTool::DCCLINUX64,
+            Platform::Android32 => CommandLineTool::DCCAARM,
+            Platform::Android64 => CommandLineTool::DCCAARM64,
+            Platform::IOSDevice64 => CommandLineTool::DCCIOSARM64,
         }
     }
 }
@@ -89,7 +121,7 @@ pub type Platforms = BTreeSet<Platform>;
 #[derive(Debug)]
 pub struct ProductInfo {
     globals: HashMap<String, String>,
-    version_info: Option<&'static VersionInfo>,
+    version_info: Option<&'static consts::VersionInfo>,
     version: String,
     product_name: String,
     personalities: Personalities,
@@ -116,7 +148,7 @@ impl ProductInfo {
                 .values()?
                 .map(|(n, v)| (n, v.try_into().unwrap_or_default()))
                 .collect(),
-            version_info: VersionInfo::new(&version),
+            version_info: consts::VersionInfo::new(&version),
             version,
             product_name,
             personalities,
@@ -252,6 +284,13 @@ impl ProductInfo {
             .into()
     }
 
+    pub fn rsvars_bat(&self, arch: &Architecture) -> PathBuf {
+        self.bin_dir(arch).join(match arch {
+            Architecture::IntelX86 => "rsvars.bat",
+            Architecture::IntelX64 => "rsvars64.bat",
+        })
+    }
+
     pub fn command_line_tools(&self, arch: &Architecture) -> CommandLineTools {
         CommandLineTool::iter()
             .filter_map(|c| c.exe_path(self, arch).exists().then_some(c))
@@ -314,7 +353,14 @@ impl Display for ProductInfo {
             .add_row(vec![
                 "Personalities",
                 "Set",
-                &format!("{:?}", self.personalities()),
+                &format!(
+                    "{{{}}}",
+                    self.personalities()
+                        .iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
             ])
             .add_row(vec![
                 "Architectures",
@@ -334,6 +380,11 @@ impl Display for ProductInfo {
                     &format!("{arch_name}App"),
                     "Sring",
                     &self.app(&arch).display().to_string(),
+                ])
+                .add_row(vec![
+                    &format!("{arch_name}rsvars.bat"),
+                    "Sring",
+                    &self.rsvars_bat(&arch).display().to_string(),
                 ])
                 .add_row(vec![
                     &format!("{arch_name}Command Line Tools"),
@@ -361,6 +412,41 @@ impl Installation {
 
     pub fn product_info(&self) -> &ProductInfo {
         &self.product_info
+    }
+
+    pub fn msbuild(
+        &self,
+        arch: &Option<Architecture>,
+        platform: &Option<Platform>,
+        options: &msbuild::Options,
+    ) -> std::io::Result<std::process::ExitStatus> {
+        let mut args = vec![
+            format!("\"{}\"", options.file.display()),
+            "/t:Build".to_string(),
+        ];
+        if let Some(config) = &options.config {
+            args.push(format!("/p:config={config}"));
+        }
+        if let Some(platform) = platform {
+            args.push(format!("/p:platform={platform:?}"));
+        }
+        if let version_info = options.version_info.to_string()
+            && !version_info.is_empty()
+        {
+            args.push("/p:VerInfo_IncludeVerInfo=true".to_string());
+            args.push(format!("/p:VerInfo_Keys=\"{version_info}\""));
+        }
+        let cmd_arg = format!(
+            "\"{}\" && MSBuild.exe {}",
+            self.product_info()
+                .rsvars_bat(arch.as_ref().unwrap_or(&Architecture::IntelX86))
+                .display(),
+            args.join(" ")
+        );
+        std::process::Command::new("cmd.exe")
+            .arg("/C")
+            .raw_arg(format!("\" {cmd_arg} \""))
+            .status()
     }
 }
 

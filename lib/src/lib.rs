@@ -1,4 +1,6 @@
 pub mod consts;
+pub mod msbuild;
+
 mod discovery;
 
 pub use discovery::find;

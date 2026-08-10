@@ -22,6 +22,9 @@ fn main() -> anyhow::Result<()> {
     };
     match app.subcmd {
         Some(cmd) => match cmd {
+            Cmd::Build { options } => {
+                installation.msbuild(&app.architecture, &app.platform, &options)?;
+            }
             Cmd::Info => print_info(app.name),
             Cmd::Self_ { subcmd } => selfcmd::execute(subcmd)?,
         },
@@ -51,11 +54,20 @@ struct App {
         alias = "arch",
         value_name = "ARCH",
         value_enum,
-        ignore_case = true
+        ignore_case = true,
+        global = true,
+        display_order = 1
     )]
     architecture: Option<Architecture>,
     /// Specify the target platform
-    #[arg(short, long, value_enum, ignore_case = true)]
+    #[arg(
+        short,
+        long,
+        value_enum,
+        ignore_case = true,
+        global = true,
+        display_order = 2
+    )]
     platform: Option<Platform>,
     #[command(subcommand)]
     subcmd: Option<Cmd>,
@@ -63,6 +75,12 @@ struct App {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
+    /// Build project file (*.dproj, *.cbproj, *.groupproj)
+    #[command(alias = "msbuild")]
+    Build {
+        #[command(flatten)]
+        options: radstudio::msbuild::Options,
+    },
     /// Print installed RAD Studio product information
     Info,
     /// Manage this tool itself
