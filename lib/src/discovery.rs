@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
-use strum::IntoEnumIterator;
+use strum::{IntoEnumIterator, VariantArray};
 use windows_registry::{CURRENT_USER, Key, Result};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
@@ -20,7 +20,17 @@ pub enum Personality {
 
 pub type Personalities = BTreeSet<Personality>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, clap::ValueEnum)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::EnumIter,
+    strum::VariantArray,
+    clap::ValueEnum,
+)]
 #[value(rename_all = "verbatim")]
 pub enum Architecture {
     /// aliases x86, 32bit, 32-bit
@@ -54,21 +64,44 @@ pub type Architectures = BTreeSet<Architecture>;
 // Command-Line Utilities Index: https://docwiki.embarcadero.com/RADStudio/en/Command-Line_Utilities_Index
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
 pub enum CommandLineTool {
+    /// RAD Studio Delphi compiler for 32-bit Windows
     DCC32,
+    /// RAD Studio Delphi compiler for 64-bit Windows
     DCC64,
+    /// RAD Studio C++ compiler for 64-bit Windows (Modern)
     BCC64X,
+    /// RAD Studio Delphi compiler for 64-bit Windows on ARM (Emulation Compatible)
     DCCARM64EC,
+    /// RAD Studio Delphi compiler for 64-bit Intel macOS
     DCCOSX64,
+    /// RAD Studio Delphi compiler for 64-bit ARM macOS
     DCCOSXARM64,
+    /// RAD Studio Delphi compiler for 64-bit Intel Linux
     DCCLINUX64,
+    /// RAD Studio Delphi compiler for 32-bit Android
     DCCAARM,
+    /// RAD Studio Delphi compiler for 64-bit Android
     DCCAARM64,
+    /// RAD Studio Delphi compiler for 64-bit iOS
     DCCIOSARM64,
 }
 
 impl CommandLineTool {
-    fn exe_path(&self, product_info: &ProductInfo, arch: &Architecture) -> PathBuf {
+    fn path(&self, product_info: &ProductInfo, arch: &Architecture) -> PathBuf {
         product_info.bin_dir(arch).join(format!("{self:?}.exe"))
+    }
+
+    fn which(&self, product_info: &ProductInfo, arch: Option<&Architecture>) -> Option<PathBuf> {
+        match arch {
+            Some(a) => match a {
+                Architecture::IntelX86 => &[Architecture::IntelX86, Architecture::IntelX64],
+                Architecture::IntelX64 => &[Architecture::IntelX64, Architecture::IntelX86],
+            },
+            None => Architecture::VARIANTS,
+        }
+        .iter()
+        .map(|a| self.path(product_info, a))
+        .find(|path| path.exists())
     }
 }
 
@@ -268,12 +301,31 @@ impl ProductInfo {
 
     pub fn architectures(&self) -> Architectures {
         Architecture::iter()
+            .filter_map(|a| self.rsvars_bat(&a).exists().then_some(a))
+            .collect()
+    }
+
+    pub fn ide_architectures(&self) -> Architectures {
+        Architecture::iter()
             .filter_map(|a| self.app(&a).exists().then_some(a))
+            .collect()
+    }
+
+    pub fn platforms(&self) -> Platforms {
+        Platform::iter()
+            .filter_map(|p| p.command_line_tool().which(self, None).map(|_| p))
             .collect()
     }
 
     pub fn bin_dir(&self, arch: &Architecture) -> PathBuf {
         self.root_dir().join(arch.bin_dir_name())
+    }
+
+    pub fn rsvars_bat(&self, arch: &Architecture) -> PathBuf {
+        self.bin_dir(arch).join(match arch {
+            Architecture::IntelX86 => "rsvars.bat",
+            Architecture::IntelX64 => "rsvars64.bat",
+        })
     }
 
     pub fn app(&self, arch: &Architecture) -> PathBuf {
@@ -284,27 +336,9 @@ impl ProductInfo {
             .into()
     }
 
-    pub fn rsvars_bat(&self, arch: &Architecture) -> PathBuf {
-        self.bin_dir(arch).join(match arch {
-            Architecture::IntelX86 => "rsvars.bat",
-            Architecture::IntelX64 => "rsvars64.bat",
-        })
-    }
-
     pub fn command_line_tools(&self, arch: &Architecture) -> CommandLineTools {
         CommandLineTool::iter()
-            .filter_map(|c| c.exe_path(self, arch).exists().then_some(c))
-            .collect()
-    }
-
-    pub fn platforms(self, arch: &Architecture) -> Platforms {
-        let command_line_tools = self.command_line_tools(arch);
-        Platform::iter()
-            .filter_map(|p| {
-                command_line_tools
-                    .contains(&p.command_line_tool())
-                    .then_some(p)
-            })
+            .filter_map(|c| c.path(self, arch).exists().then_some(c))
             .collect()
     }
 }
@@ -347,7 +381,7 @@ impl Display for ProductInfo {
             .add_row(vec!["Full Name", "String", &self.full_name()])
             .add_row(vec![
                 "Root Dir",
-                "String",
+                "Path",
                 &self.root_dir().display().to_string(),
             ])
             .add_row(vec![
@@ -363,31 +397,37 @@ impl Display for ProductInfo {
                 ),
             ])
             .add_row(vec![
-                "Architectures",
+                "Toolchain Architectures",
                 "Set",
                 &format!("{:?}", self.architectures()),
-            ]);
+            ])
+            .add_row(vec![
+                "IDE Architectures",
+                "Set",
+                &format!("{:?}", self.ide_architectures()),
+            ])
+            .add_row(vec!["Platforms", "Set", &format!("{:?}", self.platforms())]);
 
         for arch in self.architectures() {
             let arch_name = format!("{:?}: ", arch);
             table
                 .add_row(vec![
                     &format!("{arch_name}Bin Dir"),
-                    "Sring",
+                    "Path",
                     &self.bin_dir(&arch).display().to_string(),
                 ])
                 .add_row(vec![
-                    &format!("{arch_name}App"),
-                    "Sring",
-                    &self.app(&arch).display().to_string(),
-                ])
-                .add_row(vec![
                     &format!("{arch_name}rsvars.bat"),
-                    "Sring",
+                    "Path",
                     &self.rsvars_bat(&arch).display().to_string(),
                 ])
                 .add_row(vec![
-                    &format!("{arch_name}Command Line Tools"),
+                    &format!("{arch_name}App"),
+                    "Path",
+                    &self.app(&arch).display().to_string(),
+                ])
+                .add_row(vec![
+                    &format!("{arch_name}Command-Line Tools"),
                     "Set",
                     &format!("{:?}", self.command_line_tools(&arch)),
                 ]);
