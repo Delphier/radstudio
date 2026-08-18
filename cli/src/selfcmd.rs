@@ -39,7 +39,7 @@ fn same_path(p: &Path, s: &str) -> bool {
     p.to_str().unwrap_or_default().eq_ignore_ascii_case(s)
 }
 
-pub(crate) fn execute(cmd: SelfCmd) -> anyhow::Result<()> {
+pub(crate) fn execute(cmd: &SelfCmd) -> anyhow::Result<()> {
     let key = CURRENT_USER.create(ENVIRONMENT)?;
     let mut paths = env_var_path(&key);
     let placeholder = env_var_placeholder(RAD_STUDIO_CLI);

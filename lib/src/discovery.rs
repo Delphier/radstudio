@@ -527,6 +527,10 @@ impl Installations {
     pub fn latest(&self) -> Option<&Installation> {
         self.items.last()
     }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
 }
 
 pub fn find() -> Result<Installations> {
