@@ -105,24 +105,23 @@ fn parse_name(name: &str) -> Result<&'static Installation, String> {
 }
 
 fn print_installation(installation: &Installation, id: Option<usize>) {
-    if let Some(id) = id {
-        print!("{}. ", id);
-    }
-    println!("{}", installation.product_info().full_name());
+    id.inspect(|id| print!("{id}. "));
+    println!("{}", installation.product_info().display_name());
     println!("{}", installation.product_info());
 }
 
 fn print_info(installation: Option<&Installation>) -> anyhow::Result<()> {
     match installation {
         Some(i) => print_installation(i, None),
-        None => match installations().count() {
-            0 | 1 => print_installation(latest_installation()?, None),
-            _ => {
+        None => {
+            if installations().count() <= 1 {
+                print_installation(latest_installation()?, None);
+            } else {
                 for (id, i) in installations().iter().enumerate() {
                     print_installation(i, Some(id + 1));
                 }
             }
-        },
+        }
     }
     Ok(())
 }

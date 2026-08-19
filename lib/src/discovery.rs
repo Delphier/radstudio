@@ -10,6 +10,12 @@ use std::{
 use strum::{IntoEnumIterator, VariantArray};
 use windows_registry::{CURRENT_USER, Key, Result};
 
+#[derive(Debug, strum::EnumString)]
+pub enum Edition {
+    #[strum(serialize = "Starter")]
+    Community,
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
 pub enum Personality {
     #[strum(serialize = "Delphi.Win32", to_string = "Delphi")]
@@ -287,12 +293,22 @@ impl ProductInfo {
         }
     }
 
+    pub fn edition(&self) -> Option<Edition> {
+        self.globals.get("Edition").and_then(|s| s.parse().ok())
+    }
+
+    pub fn display_name(&self) -> String {
+        match self.edition() {
+            Some(e) => format!("{} {e:?} Edition", self.full_name()),
+            None => self.full_name(),
+        }
+    }
+
     pub fn root_dir(&self) -> PathBuf {
         self.globals
             .get("RootDir")
-            .cloned()
+            .map(PathBuf::from)
             .unwrap_or_default()
-            .into()
     }
 
     pub fn personalities(&self) -> &Personalities {
@@ -379,6 +395,14 @@ impl Display for ProductInfo {
             .add_row(vec!["Name", "String", &self.name()])
             .add_row(vec!["Code Name", "String", self.code_name()])
             .add_row(vec!["Full Name", "String", &self.full_name()])
+            .add_row(vec![
+                "Edition",
+                "Enum",
+                &self
+                    .edition()
+                    .map_or("<Unknown>".to_string(), |e| format!("{e:?}")),
+            ])
+            .add_row(vec!["Display Name", "String", &self.display_name()])
             .add_row(vec![
                 "Root Dir",
                 "Path",
