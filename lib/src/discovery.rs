@@ -1,4 +1,4 @@
-use crate::{consts, msbuild};
+use crate::{brcc::Brcc, consts, msbuild};
 use comfy_table::Table;
 use std::{
     collections::{BTreeSet, HashMap},
@@ -90,14 +90,20 @@ pub enum CommandLineTool {
     DCCAARM64,
     /// RAD Studio Delphi compiler for 64-bit iOS
     DCCIOSARM64,
+    /// Resource compiler
+    BRCC32,
 }
 
 impl CommandLineTool {
-    fn path(&self, product_info: &ProductInfo, arch: &Architecture) -> PathBuf {
-        product_info.bin_dir(arch).join(format!("{self:?}.exe"))
+    pub fn file_name(&self) -> String {
+        format!("{self:?}.exe")
     }
 
-    fn which(&self, product_info: &ProductInfo, arch: Option<&Architecture>) -> Option<PathBuf> {
+    fn path(&self, product_info: &ProductInfo, arch: &Architecture) -> PathBuf {
+        product_info.bin_dir(arch).join(self.file_name())
+    }
+
+    fn which(&self, product_info: &ProductInfo, arch: &Option<Architecture>) -> Option<PathBuf> {
         match arch {
             Some(a) => match a {
                 Architecture::IntelX86 => &[Architecture::IntelX86, Architecture::IntelX64],
@@ -329,7 +335,7 @@ impl ProductInfo {
 
     pub fn platforms(&self) -> Platforms {
         Platform::iter()
-            .filter_map(|p| p.command_line_tool().which(self, None).map(|_| p))
+            .filter_map(|p| p.command_line_tool().which(self, &None).map(|_| p))
             .collect()
     }
 
@@ -511,6 +517,12 @@ impl Installation {
             .arg("/C")
             .raw_arg(format!("\" {cmd_arg} \""))
             .status()
+    }
+
+    pub fn brcc32(&self, arch: &Option<Architecture>) -> Option<Brcc> {
+        CommandLineTool::BRCC32
+            .which(self.product_info(), arch)
+            .map(|path| Brcc::new(path))
     }
 }
 

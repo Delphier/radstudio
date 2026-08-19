@@ -2,7 +2,7 @@ mod selfcmd;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use radstudio::{Architecture, Installation, Installations, Platform};
+use radstudio::{Architecture, CommandLineTool, Installation, Installations, Platform};
 use std::sync::OnceLock;
 
 const APP_NAME: &'static str = "RAD Studio CLI";
@@ -19,6 +19,12 @@ fn main() -> anyhow::Result<()> {
             app.installation()?
                 .msbuild(&app.architecture, &app.platform, &options)?;
         }
+        Some(Cmd::Brcc { options }) => {
+            app.installation()?
+                .brcc32(&app.architecture)
+                .context(err_clt_not_found(CommandLineTool::BRCC32))?
+                .execute(&options)?;
+        }
         Some(Cmd::Info) => print_info(app.name)?,
         Some(Cmd::Self_ { subcmd }) => selfcmd::execute(&subcmd)?,
         None => print_info(Some(app.installation()?))?,
@@ -28,11 +34,17 @@ fn main() -> anyhow::Result<()> {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Build project file (*.dproj, *.cbproj, *.groupproj)
+    /// Build project (*.dproj, *.cbproj, *.groupproj)
     #[command(alias = "msbuild")]
     Build {
         #[command(flatten)]
         options: radstudio::msbuild::Options,
+    },
+    /// Resource compiler (brcc32.exe)
+    #[command(alias = "brcc32")]
+    Brcc {
+        #[command(flatten)]
+        options: radstudio::brcc::Options,
     },
     /// Print installed RAD Studio product information
     Info,
@@ -102,6 +114,10 @@ fn parse_name(name: &str) -> Result<&'static Installation, String> {
     installations()
         .find_by_name(name)
         .ok_or("no installed RAD Studio matched".to_string())
+}
+
+fn err_clt_not_found(clt: CommandLineTool) -> String {
+    format!("{} not found", clt.file_name())
 }
 
 fn print_installation(installation: &Installation, id: Option<usize>) {
