@@ -1,5 +1,5 @@
 [workspace]
-members = ["lib", "cli"]
+members = ["crates/radstudio", "crates/radstudio-cli"]
 resolver = "3"
 
 [workspace.package]

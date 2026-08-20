@@ -8,7 +8,7 @@ name = "radstudio"
 path = "src/main.rs"
 
 [dependencies]
-radstudio = {path = "../lib"}
+radstudio = {path = "../radstudio"}
 anyhow = "1.0.104"
 clap-cargo = "0.18.3"
 clap.workspace = true
