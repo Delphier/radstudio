@@ -1,3 +1,9 @@
+<div align="left">
+  <a href="https://www.embarcadero.com/products/rad-studio">
+    <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Delphi_Logo_12.svg" alt="Delphi Logo" width="120" />
+  </a>
+</div>
+
 # RAD Studio CLI
 
 A command-line tool for discovering installed [Embarcadero RAD Studio](https://www.embarcadero.com/products/rad-studio) products (Delphi / C++Builder) and working with them — building projects with MSBuild, compiling resource files, and more — without having to open the IDE.
@@ -64,8 +70,6 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | `brcc` (alias `brcc32`)           | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
 | `info`                            | Print installed RAD Studio product information                          |
 | `self install` / `self uninstall` | Add or remove this tool from the user `PATH`                            |
-
-Running `radstudio` with no command prints information about the selected installation (or all installations, if none is specified).
 
 ### Options
 
@@ -137,9 +141,9 @@ radstudio 13 brcc MyProject.rc MyProject.res
 This is a Cargo workspace with two crates:
 
 ```
-radstudio/
-├── lib/    # `radstudio` library crate — registry discovery, product info, MSBuild/BRCC integration
-└── cli/    # `radstudio-cli` crate — the `radstudio` command-line binary
+crates/
+├── radstudio/        # library crate — registry discovery, product info, tools integration
+└── radstudio-cli/    # cli crate — the `radstudio` command-line binary
 ```
 
 ## Contributing
