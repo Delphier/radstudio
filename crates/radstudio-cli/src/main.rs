@@ -17,7 +17,9 @@ fn main() -> anyhow::Result<()> {
     match &app.subcmd {
         Some(Cmd::Build { options }) => {
             app.installation()?
-                .msbuild(&app.architecture, &app.platform, &options)?;
+                .msbuild(&app.architecture)
+                .context("MSBuild.exe not found")?
+                .execute(&app.platform, &options)?;
         }
         Some(Cmd::Brcc { options }) => {
             app.installation()?

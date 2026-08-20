@@ -1,9 +1,8 @@
-use crate::{brcc::Brcc, consts, msbuild};
+use crate::{brcc::Brcc, consts, msbuild::MsBuild};
 use comfy_table::Table;
 use std::{
     collections::{BTreeSet, HashMap},
     fmt::Display,
-    os::windows::process::CommandExt,
     path::PathBuf,
     str::FromStr,
 };
@@ -484,39 +483,15 @@ impl Installation {
         &self.product_info
     }
 
-    pub fn msbuild(
-        &self,
-        arch: &Option<Architecture>,
-        platform: &Option<Platform>,
-        options: &msbuild::Options,
-    ) -> std::io::Result<std::process::ExitStatus> {
-        let mut args = vec![
-            format!("\"{}\"", options.file.display()),
-            "/t:Build".to_string(),
-        ];
-        if let Some(config) = &options.config {
-            args.push(format!("/p:config={config}"));
-        }
-        if let Some(platform) = platform {
-            args.push(format!("/p:platform={platform:?}"));
-        }
-        if let version_info = options.version_info.to_string()
-            && !version_info.is_empty()
-        {
-            args.push("/p:VerInfo_IncludeVerInfo=true".to_string());
-            args.push(format!("/p:VerInfo_Keys=\"{version_info}\""));
-        }
-        let cmd_arg = format!(
-            "\"{}\" && MSBuild.exe {}",
-            self.product_info()
-                .rsvars_bat(arch.as_ref().unwrap_or(&Architecture::IntelX86))
-                .display(),
-            args.join(" ")
-        );
-        std::process::Command::new("cmd.exe")
-            .arg("/C")
-            .raw_arg(format!("\" {cmd_arg} \""))
-            .status()
+    pub fn msbuild(&self, arch: &Option<Architecture>) -> Option<MsBuild> {
+        let product_info = self.product_info();
+        let archs = product_info.architectures();
+        let arch = match arch.as_ref() {
+            Some(a) if archs.contains(a) => a,
+            Some(_) => return None,
+            None => archs.first()?,
+        };
+        Some(MsBuild::new(product_info.rsvars_bat(arch)))
     }
 
     pub fn brcc32(&self, arch: &Option<Architecture>) -> Option<Brcc> {
