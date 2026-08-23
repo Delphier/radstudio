@@ -516,12 +516,15 @@ impl Installation {
     pub fn msbuild(&self, arch: &Option<Architecture>) -> Option<MsBuild> {
         let product_info = self.product_info();
         let archs = product_info.architectures();
-        let arch = match arch.as_ref() {
+        let arch_valid = match arch.as_ref() {
             Some(a) if archs.contains(a) => a,
             Some(_) => return None,
             None => archs.first()?,
         };
-        Some(MsBuild::new(product_info.rsvars_bat(arch)))
+        Some(MsBuild::new(
+            product_info.rsvars_bat(arch_valid),
+            arch.clone(),
+        ))
     }
 
     pub fn brcc32(&self, arch: &Option<Architecture>) -> Option<Brcc> {

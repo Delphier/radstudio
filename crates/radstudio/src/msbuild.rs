@@ -1,4 +1,4 @@
-use crate::Platform;
+use crate::{Architecture, Platform};
 use std::process::{Command, ExitStatus};
 use std::{collections::BTreeMap, fmt::Display, os::windows::process::CommandExt, path::PathBuf};
 use unicase::Ascii;
@@ -90,11 +90,15 @@ impl Display for VersionInfo {
 
 pub struct MsBuild {
     rsvars_bat: PathBuf,
+    tool_arch: Option<Architecture>,
 }
 
 impl MsBuild {
-    pub(crate) fn new(rsvars_bat: PathBuf) -> Self {
-        Self { rsvars_bat }
+    pub(crate) fn new(rsvars_bat: PathBuf, tool_arch: Option<Architecture>) -> Self {
+        Self {
+            rsvars_bat,
+            tool_arch,
+        }
     }
 
     pub fn execute(
@@ -116,6 +120,9 @@ impl MsBuild {
         if !version_info.is_empty() {
             args.push("/p:VerInfo_IncludeVerInfo=true".to_string());
             args.push(format!("/p:VerInfo_Keys=\"{version_info}\""));
+        }
+        if let Some(arch) = &self.tool_arch {
+            args.push(format!("/p:DCC_PreferredToolArchitecture={arch}"));
         }
         let cmd_arg = format!(
             "\"{}\" && MSBuild.exe {}",
