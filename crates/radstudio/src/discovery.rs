@@ -1,13 +1,50 @@
 use crate::{brcc::Brcc, consts, msbuild::MsBuild};
 use comfy_table::Table;
-use std::{
-    collections::{BTreeSet, HashMap},
-    fmt::Display,
-    path::PathBuf,
-    str::FromStr,
-};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
 use strum::{IntoEnumIterator, VariantArray};
 use windows_registry::{CURRENT_USER, Key, Result};
+
+pub struct BTreeSet<T>(std::collections::BTreeSet<T>);
+
+impl<T> BTreeSet<T> {
+    fn new() -> Self {
+        Self(std::collections::BTreeSet::new())
+    }
+}
+
+impl<T: Display> Display for BTreeSet<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        for (i, v) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            };
+            write!(f, "{v}")?;
+        }
+        write!(f, "}}")
+    }
+}
+
+impl<T> std::iter::IntoIterator for BTreeSet<T> {
+    type Item = T;
+    type IntoIter = std::collections::btree_set::IntoIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T: Ord> std::iter::FromIterator<T> for BTreeSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(std::collections::BTreeSet::from_iter(iter))
+    }
+}
+
+impl<T> std::ops::Deref for BTreeSet<T> {
+    type Target = std::collections::BTreeSet<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, strum::EnumString)]
 pub enum Edition {
@@ -15,7 +52,7 @@ pub enum Edition {
     Community,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
 pub enum Personality {
     #[strum(serialize = "Delphi.Win32", to_string = "Delphi")]
     Delphi,
@@ -34,30 +71,32 @@ pub type Personalities = BTreeSet<Personality>;
     Ord,
     strum::EnumIter,
     strum::VariantArray,
+    strum::Display,
     clap::ValueEnum,
 )]
-#[value(rename_all = "verbatim")]
 pub enum Architecture {
-    /// aliases x86, 32bit, 32-bit
-    #[value(aliases = ["x86", "32bit", "32-bit"])]
-    IntelX86,
-    /// aliases x64, 64bit, 64-bit
-    #[value(aliases = ["x64", "64bit", "64-bit"])]
-    IntelX64,
+    /// x86 toolchain or 32-bit IDE
+    #[value(aliases = ["IntelX86", "32bit", "32-bit"])]
+    #[strum(to_string = "x86")]
+    X86,
+    /// x64 toolchain or 64-bit IDE
+    #[value(aliases = ["IntelX64", "64bit", "64-bit"])]
+    #[strum(to_string = "x64")]
+    X64,
 }
 
 impl Architecture {
     fn bin_dir_name(&self) -> &'static str {
         match self {
-            Architecture::IntelX86 => "bin",
-            Architecture::IntelX64 => "bin64",
+            Architecture::X86 => "bin",
+            Architecture::X64 => "bin64",
         }
     }
 
     fn reg_name_suffix(&self) -> &'static str {
         match self {
-            Architecture::IntelX86 => "",
-            Architecture::IntelX64 => " x64",
+            Architecture::X86 => "",
+            Architecture::X64 => " x64",
         }
     }
 }
@@ -67,7 +106,7 @@ pub type Architectures = BTreeSet<Architecture>;
 // Delphi toolchains: https://docwiki.embarcadero.com/RADStudio/en/Delphi_Toolchains
 // C++Builder toolchains: https://docwiki.embarcadero.com/RADStudio/en/C++_Toolchains
 // Command-Line Utilities Index: https://docwiki.embarcadero.com/RADStudio/en/Command-Line_Utilities_Index
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, strum::Display)]
 pub enum CommandLineTool {
     /// RAD Studio Delphi compiler for 32-bit Windows
     DCC32,
@@ -104,10 +143,8 @@ impl CommandLineTool {
 
     fn which(&self, product_info: &ProductInfo, arch: &Option<Architecture>) -> Option<PathBuf> {
         match arch {
-            Some(a) => match a {
-                Architecture::IntelX86 => &[Architecture::IntelX86, Architecture::IntelX64],
-                Architecture::IntelX64 => &[Architecture::IntelX64, Architecture::IntelX86],
-            },
+            Some(Architecture::X86) => &[Architecture::X86, Architecture::X64],
+            Some(Architecture::X64) => &[Architecture::X64, Architecture::X86],
             None => Architecture::VARIANTS,
         }
         .iter()
@@ -118,7 +155,9 @@ impl CommandLineTool {
 
 pub type CommandLineTools = BTreeSet<CommandLineTool>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, clap::ValueEnum)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, strum::Display, clap::ValueEnum,
+)]
 #[value(rename_all = "verbatim")]
 pub enum Platform {
     /// 32-bit Intel Windows
@@ -162,7 +201,6 @@ impl Platform {
 
 pub type Platforms = BTreeSet<Platform>;
 
-#[derive(Debug)]
 pub struct ProductInfo {
     globals: HashMap<String, String>,
     version_info: Option<&'static consts::VersionInfo>,
@@ -344,8 +382,8 @@ impl ProductInfo {
 
     pub fn rsvars_bat(&self, arch: &Architecture) -> PathBuf {
         self.bin_dir(arch).join(match arch {
-            Architecture::IntelX86 => "rsvars.bat",
-            Architecture::IntelX64 => "rsvars64.bat",
+            Architecture::X86 => "rsvars.bat",
+            Architecture::X64 => "rsvars64.bat",
         })
     }
 
@@ -416,29 +454,22 @@ impl Display for ProductInfo {
             .add_row(vec![
                 "Personalities",
                 "Set",
-                &format!(
-                    "{{{}}}",
-                    self.personalities()
-                        .iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
+                &format!("{}", self.personalities()),
             ])
             .add_row(vec![
                 "Toolchain Architectures",
                 "Set",
-                &format!("{:?}", self.architectures()),
+                &format!("{}", self.architectures()),
             ])
             .add_row(vec![
                 "IDE Architectures",
                 "Set",
-                &format!("{:?}", self.ide_architectures()),
+                &format!("{}", self.ide_architectures()),
             ])
-            .add_row(vec!["Platforms", "Set", &format!("{:?}", self.platforms())]);
+            .add_row(vec!["Platforms", "Set", &format!("{}", self.platforms())]);
 
         for arch in self.architectures() {
-            let arch_name = format!("{:?}: ", arch);
+            let arch_name = format!("{arch}: ");
             table
                 .add_row(vec![
                     &format!("{arch_name}Bin Dir"),
@@ -458,14 +489,13 @@ impl Display for ProductInfo {
                 .add_row(vec![
                     &format!("{arch_name}Command-Line Tools"),
                     "Set",
-                    &format!("{:?}", self.command_line_tools(&arch)),
+                    &format!("{}", self.command_line_tools(&arch)),
                 ]);
         }
         writeln!(f, "{table}")
     }
 }
 
-#[derive(Debug)]
 pub struct Installation {
     product_info: ProductInfo,
     //root_key: Key,

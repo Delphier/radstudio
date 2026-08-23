@@ -57,7 +57,7 @@ enum Cmd {
     },
 }
 
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[command(name = APP_NAME, version, about = APP_NAME)]
 #[command(arg_required_else_help = true, styles = clap_cargo::style::CLAP_STYLING)]
 struct App {
