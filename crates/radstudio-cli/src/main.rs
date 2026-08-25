@@ -5,7 +5,7 @@ mod self_;
 use anyhow::{Context, bail};
 use clap::{Parser, Subcommand};
 use radstudio::{
-    Architecture, Architectures, CommandLineTool, Installation, Installations, Platform,
+    Architecture, Architectures, CommandLineTool, Installation, Installations, Platform, Platforms,
 };
 use std::sync::OnceLock;
 
@@ -37,6 +37,24 @@ fn main() -> anyhow::Result<()> {
         Some(Cmd::EnvPath { subcmd }) => {
             env::path::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
         }
+        Some(Cmd::LibraryPath { subcmd }) => {
+            paths::PathsCmd::execute(
+                "Library Path",
+                Installation::LIBRARY_PATH,
+                subcmd,
+                app.installation()?,
+                app.platforms()?,
+            )?;
+        }
+        Some(Cmd::BrowsingPath { subcmd }) => {
+            paths::PathsCmd::execute(
+                "Browsing Path",
+                Installation::BROWSING_PATH,
+                subcmd,
+                app.installation()?,
+                app.platforms()?,
+            )?;
+        }
         Some(Cmd::Info) => print_info(app.name)?,
         Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
         None => print_info(Some(app.installation()?))?,
@@ -66,6 +84,18 @@ enum Cmd {
     /// Manage IDE environment variable PATH
     #[command(aliases = ["envpath", "path"])]
     EnvPath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
+    },
+    /// Manage IDE library path
+    #[command(aliases = ["librarypath", "lib-path", "libpath"])]
+    LibraryPath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
+    },
+    /// Manage IDE browsing path
+    #[command(alias = "browsingpath")]
+    BrowsingPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
@@ -132,6 +162,15 @@ impl App {
             Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
             Some(a) => bail!("{} is not installed", a.ide_name()),
             None => ide_archs,
+        })
+    }
+
+    fn platforms(&self) -> anyhow::Result<Platforms> {
+        let platforms = self.installation()?.product_info().platforms();
+        Ok(match &self.platform {
+            Some(p) if platforms.contains(p) => std::iter::once(p.to_owned()).collect(),
+            Some(p) => bail!("{p} platform is not installed"),
+            None => platforms,
         })
     }
 }

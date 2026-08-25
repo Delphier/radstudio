@@ -1,6 +1,6 @@
 use crate::{brcc::Brcc, consts, msbuild::MsBuild};
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
-use envz::Environment;
+use envz::{Environment, registry::Node, registry::StringEntry};
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -563,6 +563,22 @@ impl Installation {
             &self.product_info().reg_key()?,
             format!("Environment Variables{}", arch.reg_name_suffix()),
             false,
+        )
+    }
+
+    pub const LIBRARY_PATH: &StringEntry = &StringEntry {
+        name: "Search Path",
+        is_expand: false,
+    };
+    pub const BROWSING_PATH: &StringEntry = &StringEntry {
+        name: "Browsing Path",
+        is_expand: false,
+    };
+
+    pub fn library(&self, platform: &Platform) -> envz::Result<Node> {
+        Node::create(
+            &self.product_info().reg_key()?,
+            format!("Library\\{platform}"),
         )
     }
 }
