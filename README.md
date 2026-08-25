@@ -1,20 +1,16 @@
-<div align="left">
-  <a href="https://www.embarcadero.com/products/rad-studio">
-    <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Delphi_Logo_12.svg" alt="Delphi Logo" width="120" />
-  </a>
-</div>
+![RAD Studio CLI](assets/radstudio.png)
 
 # RAD Studio CLI
 
-A command-line tool for discovering installed [Embarcadero RAD Studio](https://www.embarcadero.com/products/rad-studio) products (Delphi / C++Builder) and working with them — building projects with MSBuild, compiling resource files, and more — without having to open the IDE.
+A command-line tool for discovering installed [Embarcadero RAD Studio](https://www.embarcadero.com/products/rad-studio) products (Delphi / C++Builder) and working with them — building projects with MSBuild, compiling resource files, managing IDE environment variables and search paths, and more — without having to open the IDE.
 
 🚧 **This tool is currently under development.** Interfaces and commands may change.
 
 ## Overview
 
-RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI. It can also drive `MSBuild` to build `.dproj`, `.cbproj`, or `.groupproj` project files using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform.
+RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI. It can also drive `MSBuild` to build `.dproj`, `.cbproj`, or `.groupproj` project files using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform, and can read or update the IDE's registry-backed environment variables and search paths.
 
-This makes it convenient to build Delphi/C++Builder projects from scripts, CI pipelines, AI agents, or any terminal.
+This makes it convenient to build Delphi/C++Builder projects and manage IDE configuration from scripts, CI pipelines, AI agents, or any terminal.
 
 ## Features
 
@@ -22,9 +18,11 @@ This makes it convenient to build Delphi/C++Builder projects from scripts, CI pi
 - 🧭 **Version selection** — target an installation by product name (`RAD Studio 13`), codename (`Florence`, `Rio`, `Berlin`), or product version (`13`, `12`, `XE2`), or default to the latest installed version.
 - 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj`/`.groupproj` files with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.).
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
+- ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
+- 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
 - ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, and detected command-line compilers.
 - 📌 **Self-install** — add (or remove) the CLI's directory to your user `PATH` so `radstudio` is available from any terminal.
-- 🚧 **In development** — compile and install `.dpk` package files; configure IDE options such as environment variables and search paths.
+- 🚧 **In development** — compile and install `.dpk` package files.
 
 ## Requirements
 
@@ -64,21 +62,30 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 
 ### Commands
 
-| Command                           | Description                                                             |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `build` (alias `msbuild`)         | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild |
-| `brcc` (alias `brcc32`)           | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
-| `info`                            | Print installed RAD Studio product information                          |
-| `self install` / `self uninstall` | Add or remove this tool from the user `PATH`                            |
+| Command                                     | Description                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild  |
+| `brcc` (alias `brcc32`)                      | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
+| `env`                                        | View, set, or remove IDE environment variables                          |
+| `env-path` (alias `path`)                     | View, add, insert, or remove entries in the IDE environment `PATH`      |
+| `library-path` (aliases `lib-path`, `libpath`) | View, add, insert, or remove entries in the IDE Library path           |
+| `browsing-path`                               | View, add, insert, or remove entries in the IDE Browsing path           |
+| `info`                                       | Print installed RAD Studio product information                          |
+| `self install` / `self uninstall`            | Add or remove this tool from the user `PATH`                            |
+
+Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand prints the current values. Each supports its own subcommands:
+
+- `env` — `set`/`add <NAME> <VALUE>` to set a variable, `remove`/`rm`/`delete`/`del <NAME>` to remove one.
+- `envpath`, `librarypath`, `browsingpath` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
 
 ### Options
 
 | Option                      | Description                                                                                                                             |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `-a, --architecture <ARCH>` | Toolchain/IDE architecture: `IntelX86` (aliases `x86`, `32bit`) or `IntelX64` (aliases `x64`, `64bit`)                                  |
 | `-p, --platform <PLATFORM>` | Target platform, e.g. `Win32`, `Win64`, `Win64x`, `WinARM64EC`, `OSX64`, `OSXARM64`, `Linux64`, `Android32`, `Android64`, `IOSDevice64` |
-| `-h, --help`                | Print help                                                                                                                              |
-| `-V, --version`             | Print version                                                                                                                           |
+| `-h, --help`                | Print help                                                                                                                                |
+| `-V, --version`             | Print version                                                                                                                             |
 
 ### Examples
 
@@ -134,6 +141,42 @@ Compile with an explicit output path, using a specific RAD Studio version:
 
 ```
 radstudio 13 brcc MyProject.rc MyProject.res
+```
+
+Show IDE environment variables for the latest installed version:
+
+```
+radstudio env
+```
+
+Set an IDE environment variable:
+
+```
+radstudio env set MY_VAR "some value"
+```
+
+Remove an IDE environment variable:
+
+```
+radstudio env remove MY_VAR
+```
+
+Append a directory to the IDE's environment `PATH`:
+
+```
+radstudio envpath add "C:\Tools\bin"
+```
+
+Show the Library path for a specific platform:
+
+```
+radstudio 13 librarypath --platform Win64
+```
+
+Insert an entry at the front of the Browsing path:
+
+```
+radstudio browsingpath insert "C:\MyLib\Include"
 ```
 
 ## Project structure
