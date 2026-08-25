@@ -1,4 +1,5 @@
 mod env;
+mod paths;
 mod self_;
 
 use anyhow::{Context, bail};
@@ -33,6 +34,9 @@ fn main() -> anyhow::Result<()> {
         Some(Cmd::Env { subcmd }) => {
             env::EnvCmd::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
         }
+        Some(Cmd::EnvPath { subcmd }) => {
+            env::path::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
+        }
         Some(Cmd::Info) => print_info(app.name)?,
         Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
         None => print_info(Some(app.installation()?))?,
@@ -58,6 +62,12 @@ enum Cmd {
     Env {
         #[command(subcommand)]
         subcmd: Option<env::EnvCmd>,
+    },
+    /// Manage IDE environment variable PATH
+    #[command(aliases = ["envpath", "path"])]
+    EnvPath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
     },
     /// Print installed RAD Studio product information
     Info,
