@@ -1,8 +1,11 @@
-mod selfcmd;
+mod env;
+mod self_;
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use clap::{Parser, Subcommand};
-use radstudio::{Architecture, CommandLineTool, Installation, Installations, Platform};
+use radstudio::{
+    Architecture, Architectures, CommandLineTool, Installation, Installations, Platform,
+};
 use std::sync::OnceLock;
 
 const APP_NAME: &'static str = "RAD Studio CLI";
@@ -27,8 +30,11 @@ fn main() -> anyhow::Result<()> {
                 .context(err_clt_not_found(CommandLineTool::BRCC32))?
                 .execute(&options)?;
         }
+        Some(Cmd::Env { subcmd }) => {
+            env::EnvCmd::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
+        }
         Some(Cmd::Info) => print_info(app.name)?,
-        Some(Cmd::Self_ { subcmd }) => selfcmd::execute(&subcmd)?,
+        Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
         None => print_info(Some(app.installation()?))?,
     };
     Ok(())
@@ -48,12 +54,17 @@ enum Cmd {
         #[command(flatten)]
         options: radstudio::brcc::Options,
     },
+    /// Manage IDE environment variables
+    Env {
+        #[command(subcommand)]
+        subcmd: Option<env::EnvCmd>,
+    },
     /// Print installed RAD Studio product information
     Info,
     /// Manage this tool itself
     Self_ {
         #[command(subcommand)]
-        subcmd: selfcmd::SelfCmd,
+        subcmd: self_::SelfCmd,
     },
 }
 
@@ -103,6 +114,15 @@ impl App {
             Some(i) => Ok(i),
             None => latest_installation(),
         }
+    }
+
+    fn ide_architectures(&self) -> anyhow::Result<Architectures> {
+        let ide_archs = self.installation()?.product_info().ide_architectures();
+        Ok(match &self.architecture {
+            Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
+            Some(a) => bail!("{} is not installed", a.ide_name()),
+            None => ide_archs,
+        })
     }
 }
 

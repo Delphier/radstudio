@@ -1,6 +1,12 @@
 use crate::{brcc::Brcc, consts, msbuild::MsBuild};
-use comfy_table::Table;
-use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
+use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
+use envz::Environment;
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use strum::{IntoEnumIterator, VariantArray};
 use windows_registry::{CURRENT_USER, Key, Result};
 
@@ -97,6 +103,13 @@ impl Architecture {
         match self {
             Architecture::X86 => "",
             Architecture::X64 => " x64",
+        }
+    }
+
+    pub fn ide_name(&self) -> &'static str {
+        match self {
+            Architecture::X86 => "32-bit IDE",
+            Architecture::X64 => "64-bit IDE",
         }
     }
 }
@@ -204,6 +217,7 @@ pub type Platforms = BTreeSet<Platform>;
 pub struct ProductInfo {
     globals: HashMap<String, String>,
     version_info: Option<&'static consts::VersionInfo>,
+    reg_parent: PathBuf,
     version: String,
     product_name: String,
     personalities: Personalities,
@@ -211,10 +225,21 @@ pub struct ProductInfo {
 }
 
 impl ProductInfo {
-    fn new(root_key: &Key, version: String) -> Result<Self> {
+    pub const REG_ROOT: &Key = CURRENT_USER;
+
+    fn reg_key_with(parent: impl AsRef<Path>, version: impl AsRef<str>) -> Result<Key> {
+        Self::REG_ROOT.open(parent.as_ref().join(version.as_ref()).display().to_string())
+    }
+
+    fn reg_key(&self) -> Result<Key> {
+        Self::reg_key_with(&self.reg_parent, self.version())
+    }
+
+    fn new(reg_parent: PathBuf, version: String) -> Result<Self> {
+        let reg_key = Self::reg_key_with(&reg_parent, &version)?;
         let product_name;
         let personalities;
-        if let Ok(key) = root_key.open("Personalities") {
+        if let Ok(key) = reg_key.open("Personalities") {
             product_name = key.get_string("").unwrap_or_default();
             personalities = key
                 .values()?
@@ -226,15 +251,16 @@ impl ProductInfo {
         };
 
         Ok(Self {
-            globals: root_key
+            globals: reg_key
                 .values()?
                 .map(|(n, v)| (n, v.try_into().unwrap_or_default()))
                 .collect(),
             version_info: consts::VersionInfo::new(&version),
+            reg_parent,
             version,
             product_name,
             personalities,
-            update_number: if let Ok(key) = root_key.open("InstalledUpdates") {
+            update_number: if let Ok(key) = reg_key.open("InstalledUpdates") {
                 key.get_string("Main Product Update")
                     .unwrap_or_default()
                     .split("Update")
@@ -366,7 +392,7 @@ impl ProductInfo {
 
     pub fn ide_architectures(&self) -> Architectures {
         Architecture::iter()
-            .filter_map(|a| self.app(&a).exists().then_some(a))
+            .filter_map(|a| self.bds_exe(&a).exists().then_some(a))
             .collect()
     }
 
@@ -387,7 +413,7 @@ impl ProductInfo {
         })
     }
 
-    pub fn app(&self, arch: &Architecture) -> PathBuf {
+    pub fn bds_exe(&self, arch: &Architecture) -> PathBuf {
         self.globals
             .get(&format!("App{}", arch.reg_name_suffix()))
             .cloned()
@@ -406,7 +432,8 @@ impl Display for ProductInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
         table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .load_style(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
             .set_header(vec!["Property", "Type", "Value"])
             .add_row(vec!["Known", "Boolean", &self.is_known().to_string()])
             .add_row(vec!["Version", "String", self.version()])
@@ -482,9 +509,9 @@ impl Display for ProductInfo {
                     &self.rsvars_bat(&arch).display().to_string(),
                 ])
                 .add_row(vec![
-                    &format!("{arch_name}App"),
+                    &format!("{arch_name}bds.exe"),
                     "Path",
-                    &self.app(&arch).display().to_string(),
+                    &self.bds_exe(&arch).display().to_string(),
                 ])
                 .add_row(vec![
                     &format!("{arch_name}Command-Line Tools"),
@@ -498,14 +525,12 @@ impl Display for ProductInfo {
 
 pub struct Installation {
     product_info: ProductInfo,
-    //root_key: Key,
 }
 
 impl Installation {
-    fn new(root_key: Key, version: String) -> Result<Self> {
+    fn new(reg_parent: PathBuf, version: String) -> Result<Self> {
         Ok(Self {
-            product_info: ProductInfo::new(&root_key, version)?,
-            //root_key,
+            product_info: ProductInfo::new(reg_parent, version)?,
         })
     }
 
@@ -531,6 +556,14 @@ impl Installation {
         CommandLineTool::BRCC32
             .which(self.product_info(), arch)
             .map(|path| Brcc::new(path))
+    }
+
+    pub fn environment_variables(&self, arch: &Architecture) -> envz::Result<Environment> {
+        Environment::create(
+            &self.product_info().reg_key()?,
+            format!("Environment Variables{}", arch.reg_name_suffix()),
+            false,
+        )
     }
 }
 
@@ -582,15 +615,15 @@ pub fn find() -> Result<Installations> {
     #[cfg(windows)]
     {
         for path in [
-            "Software\\Borland\\BDS",
-            "Software\\CodeGear\\BDS",
-            "Software\\Embarcadero\\BDS",
+            r"Software\Borland\BDS",
+            r"Software\CodeGear\BDS",
+            r"Software\Embarcadero\BDS",
         ] {
             let Ok(bds) = CURRENT_USER.open(path) else {
                 continue;
             };
             for version in bds.keys()? {
-                installs.push(Installation::new(bds.open(&version)?, version)?);
+                installs.push(Installation::new(PathBuf::from(path), version)?);
             }
         }
     }
