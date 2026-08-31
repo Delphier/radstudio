@@ -8,7 +8,7 @@ A command-line tool for discovering installed [Embarcadero RAD Studio](https://w
 
 ## Overview
 
-RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI. It can also drive `MSBuild` to build `.dproj`, `.cbproj`, or `.groupproj` project files using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform, and can read or update the IDE's registry-backed environment variables and search paths.
+RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI. It can also drive `MSBuild` to build `.dproj`, `.cbproj`, or `.groupproj` project files using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform, invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`), and can read or update the IDE's registry-backed environment variables and search paths.
 
 This makes it convenient to build Delphi/C++Builder projects and manage IDE configuration from scripts, CI pipelines, AI agents, or any terminal.
 
@@ -17,6 +17,7 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 🔍 **Discovery** — automatically detects all installed RAD Studio/Delphi/C++Builder versions from the registry.
 - 🧭 **Version selection** — target an installation by product name (`RAD Studio 13`), codename (`Florence`, `Rio`, `Berlin`), or product version (`13`, `12`, `XE2`), or default to the latest installed version.
 - 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj`/`.groupproj` files with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.).
+- 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches.
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
 - 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
@@ -65,6 +66,9 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | Command                                     | Description                                                              |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild  |
+| `dcc32`                                      | Compile Delphi files for Win32 via `DCC32.exe`                  |
+| `dcc64`                                      | Compile Delphi files for Win64 via `DCC64.exe`                  |
+| `dccarm64ec`                                 | Compile Delphi files for WinARM64EC via `DCCARM64EC.exe`        |
 | `brcc` (alias `brcc32`)                      | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
 | `env`                                        | View, set, or remove IDE environment variables                          |
 | `env-path` (alias `path`)                     | View, add, insert, or remove entries in the IDE environment `PATH`      |
@@ -77,6 +81,8 @@ Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand pr
 
 - `env` — `set`/`add <NAME> <VALUE>` to set a variable, `remove`/`rm`/`delete`/`del <NAME>` to remove one.
 - `envpath`, `librarypath`, `browsingpath` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
+
+`dcc32`, `dcc64`, and `dccarm64ec` take a source `<FILE>` plus compiler options: `--no-config` (skip the default `dcc*.cfg`), `-D/--define <NAME>` (repeatable), `--unit-search-dirs`/`--resource-search-dirs`/`--include-search-dirs <DIRS>`, `-B/--build` (rebuild all units), `-Q/--quiet`, `--output-dir`/`--unit-output-dir`/`--package-bpl-output-dir`/`--package-dcp-output-dir <DIR>`, C++Builder-related flags (`--cpp`, `--cpp-win64x`, `--cpp-bpi-output-dir`, `--cpp-hpp-output-dir`, `--cpp-obj-output-dir`), and `--options <RAW>` to append any additional raw compiler switches verbatim.
 
 ### Options
 
@@ -118,7 +124,7 @@ radstudio 13 build MyProject.dproj --config Release --platform Win64
 Build the project using the 64-bit toolchain:
 
 ```
-radstudio XE2 build MyProject.dproj --arch x64
+radstudio XE8 build MyProject.dproj --arch x64
 ```
 
 Build and stamp the output with version-info resources:
@@ -129,6 +135,24 @@ radstudio build MyProject.dproj `
   --CompanyName "My Company" `
   --ProductName "My Product" `
   --LegalCopyright "Copyright © 2026 My Company"
+```
+
+Compile a Delphi source file directly with `DCC32.exe`:
+
+```
+radstudio dcc32 MyProject.dpr
+```
+
+Compile for Win64 with a conditional define and a custom unit output directory:
+
+```
+radstudio dcc64 MyProject.dpr -d DEBUG --unit-output-dir .\dcu
+```
+
+Compile for WinARM64EC using a specific RAD Studio version, passing raw extra options through:
+
+```
+radstudio 13 dccarm64ec MyProject.dpr --options "-W-SYMBOL_DEPRECATED"
 ```
 
 Compile a resource script into a `.res` file:
