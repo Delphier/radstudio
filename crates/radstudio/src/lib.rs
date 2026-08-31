@@ -1,5 +1,6 @@
 pub mod brcc;
 pub mod consts;
+pub mod dcc;
 pub mod msbuild;
 
 mod discovery;

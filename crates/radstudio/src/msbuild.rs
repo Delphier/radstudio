@@ -19,7 +19,7 @@ pub struct Options {
 #[derive(Debug, Clone, clap::Args, serde::Serialize)]
 #[command(
     rename_all = "PascalCase",
-    next_help_heading = "Include version information"
+    next_help_heading = "Include Version Information"
 )]
 #[serde(rename_all = "PascalCase")]
 pub struct VersionInfo {

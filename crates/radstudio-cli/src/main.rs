@@ -21,14 +21,23 @@ fn main() -> anyhow::Result<()> {
     match &app.subcmd {
         Some(Cmd::Build { options }) => {
             app.installation()?
-                .msbuild(&app.architecture)
+                .msbuild(&app.global.architecture)
                 .context("MSBuild.exe not found")?
-                .execute(&app.platform, &options)?;
+                .execute(&app.global.platform, &options)?;
+        }
+        Some(Cmd::Dcc32 { options }) => {
+            app.dcc_execute(&CommandLineTool::DCC32, &options)?;
+        }
+        Some(Cmd::Dcc64 { options }) => {
+            app.dcc_execute(&CommandLineTool::DCC64, &options)?;
+        }
+        Some(Cmd::Dccarm64ec { options }) => {
+            app.dcc_execute(&CommandLineTool::DCCARM64EC, &options)?;
         }
         Some(Cmd::Brcc { options }) => {
             app.installation()?
-                .brcc32(&app.architecture)
-                .context(err_clt_not_found(CommandLineTool::BRCC32))?
+                .brcc32(&app.global.architecture)
+                .context(err_clt_not_found(&CommandLineTool::BRCC32))?
                 .execute(&options)?;
         }
         Some(Cmd::Env { subcmd }) => {
@@ -69,6 +78,21 @@ enum Cmd {
     Build {
         #[command(flatten)]
         options: radstudio::msbuild::Options,
+    },
+    /// Delphi command-line compiler for Win32
+    Dcc32 {
+        #[command(flatten)]
+        options: radstudio::dcc::Options,
+    },
+    /// Delphi command-line compiler for Win64
+    Dcc64 {
+        #[command(flatten)]
+        options: radstudio::dcc::Options,
+    },
+    /// Delphi command-line compiler for WinARM64EC
+    Dccarm64ec {
+        #[command(flatten)]
+        options: radstudio::dcc::Options,
     },
     /// Resource compiler (brcc32.exe)
     #[command(alias = "brcc32")]
@@ -122,6 +146,16 @@ struct App {
     /// If omitted, the latest installed version is used.
     #[arg(verbatim_doc_comment, value_parser = parse_name)]
     name: Option<&'static Installation>,
+
+    #[command(subcommand)]
+    subcmd: Option<Cmd>,
+
+    #[command(flatten, next_help_heading = "Global Options")]
+    global: GlobalOptions,
+}
+
+#[derive(Debug, clap::Args)]
+struct GlobalOptions {
     /// Specify the toolchain or IDE architecture
     #[arg(
         short,
@@ -144,8 +178,6 @@ struct App {
         display_order = 2
     )]
     platform: Option<Platform>,
-    #[command(subcommand)]
-    subcmd: Option<Cmd>,
 }
 
 impl App {
@@ -158,7 +190,7 @@ impl App {
 
     fn ide_architectures(&self) -> anyhow::Result<Architectures> {
         let ide_archs = self.installation()?.product_info().ide_architectures();
-        Ok(match &self.architecture {
+        Ok(match &self.global.architecture {
             Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
             Some(a) => bail!("{} is not installed", a.ide_name()),
             None => ide_archs,
@@ -167,11 +199,23 @@ impl App {
 
     fn platforms(&self) -> anyhow::Result<Platforms> {
         let platforms = self.installation()?.product_info().platforms();
-        Ok(match &self.platform {
+        Ok(match &self.global.platform {
             Some(p) if platforms.contains(p) => std::iter::once(p.to_owned()).collect(),
             Some(p) => bail!("{p} platform is not installed"),
             None => platforms,
         })
+    }
+
+    fn dcc_execute(
+        &self,
+        clt: &CommandLineTool,
+        options: &radstudio::dcc::Options,
+    ) -> anyhow::Result<()> {
+        self.installation()?
+            .dcc(clt, &self.global.architecture)
+            .context(err_clt_not_found(clt))?
+            .execute(options)?;
+        Ok(())
     }
 }
 
@@ -187,7 +231,7 @@ fn parse_name(name: &str) -> Result<&'static Installation, String> {
         .ok_or("no installed RAD Studio matched".to_string())
 }
 
-fn err_clt_not_found(clt: CommandLineTool) -> String {
+fn err_clt_not_found(clt: &CommandLineTool) -> String {
     format!("{} not found", clt.file_name())
 }
 

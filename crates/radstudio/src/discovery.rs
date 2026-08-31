@@ -1,4 +1,4 @@
-use crate::{brcc::Brcc, consts, msbuild::MsBuild};
+use crate::{brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use envz::{Environment, registry::Node, registry::StringEntry};
 use std::{
@@ -550,6 +550,23 @@ impl Installation {
             product_info.rsvars_bat(arch_valid),
             arch.clone(),
         ))
+    }
+
+    pub fn dcc(&self, clt: &CommandLineTool, arch: &Option<Architecture>) -> Option<Dcc> {
+        clt.which(self.product_info(), arch)
+            .map(|path| Dcc::new(path))
+    }
+
+    pub fn dcc32(&self, arch: &Option<Architecture>) -> Option<Dcc> {
+        self.dcc(&CommandLineTool::DCC32, arch)
+    }
+
+    pub fn dcc64(&self, arch: &Option<Architecture>) -> Option<Dcc> {
+        self.dcc(&CommandLineTool::DCC64, arch)
+    }
+
+    pub fn dccarm64ec(&self, arch: &Option<Architecture>) -> Option<Dcc> {
+        self.dcc(&CommandLineTool::DCCARM64EC, arch)
     }
 
     pub fn brcc32(&self, arch: &Option<Architecture>) -> Option<Brcc> {
