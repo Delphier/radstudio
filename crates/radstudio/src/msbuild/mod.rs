@@ -3,6 +3,25 @@ use std::process::{Command, ExitStatus};
 use std::{collections::BTreeMap, fmt::Display, os::windows::process::CommandExt, path::PathBuf};
 use unicase::Ascii;
 
+pub mod patcher;
+
+mod consts {
+    pub const EXT_GROUPPROJ: &'static str = "groupproj";
+    pub const EXT_DPROJ: &'static str = "dproj";
+    pub const EXT_CBPROJ: &'static str = "cbproj";
+
+    pub const PROPERTY_GROUP: &'static str = "PropertyGroup";
+
+    pub const CONFIG: &'static str = "Config";
+    pub const PLATFORM: &'static str = "Platform";
+    pub const VERINFO_INCLUDE_VERINFO: &'static str = "VerInfo_IncludeVerInfo";
+    pub const VERINFO_KEYS: &'static str = "VerInfo_Keys";
+    pub const DCC_USE_MSBUILD_EXTERNALLY: &'static str = "DCC_UseMSBuildExternally";
+    pub const DCC_PREFERRED_TOOL_ARCHITECTURE: &'static str = "DCC_PreferredToolArchitecture";
+    pub const PRE_BUILD_EVENT: &'static str = "PreBuildEvent";
+}
+use consts::*;
+
 #[derive(Debug, clap::Args)]
 pub struct Options {
     /// Specify project file path
@@ -90,19 +109,16 @@ impl Display for VersionInfo {
 
 pub struct MsBuild {
     rsvars_bat: PathBuf,
-    tool_arch: Option<Architecture>,
 }
 
 impl MsBuild {
-    pub(crate) fn new(rsvars_bat: PathBuf, tool_arch: Option<Architecture>) -> Self {
-        Self {
-            rsvars_bat,
-            tool_arch,
-        }
+    pub(crate) fn new(rsvars_bat: PathBuf) -> Self {
+        Self { rsvars_bat }
     }
 
     pub fn execute(
         &self,
+        arch: &Option<Architecture>,
         platform: &Option<Platform>,
         options: &Options,
     ) -> std::io::Result<ExitStatus> {
@@ -111,18 +127,18 @@ impl MsBuild {
             "/t:Build".to_string(),
         ];
         if let Some(config) = &options.config {
-            args.push(format!("/p:Config={config}"));
+            args.push(format!("/p:{CONFIG}={config}"));
         }
         if let Some(platform) = platform {
-            args.push(format!("/p:Platform={platform:?}"));
+            args.push(format!("/p:{PLATFORM}={platform}"));
         }
         let version_info = options.version_info.to_string();
         if !version_info.is_empty() {
-            args.push("/p:VerInfo_IncludeVerInfo=true".to_string());
-            args.push(format!("/p:VerInfo_Keys=\"{version_info}\""));
+            args.push(format!("/p:{VERINFO_INCLUDE_VERINFO}=true"));
+            args.push(format!("/p:{VERINFO_KEYS}=\"{version_info}\""));
         }
-        if let Some(arch) = &self.tool_arch {
-            args.push(format!("/p:DCC_PreferredToolArchitecture={arch}"));
+        if let Some(arch) = arch {
+            args.push(format!("/p:{DCC_PREFERRED_TOOL_ARCHITECTURE}={arch}"));
         }
         let cmd_arg = format!(
             "\"{}\" && MSBuild.exe {}",

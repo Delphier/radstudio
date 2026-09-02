@@ -1,4 +1,4 @@
-use crate::{brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
+use crate::{bds::Bds, brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use envz::{Environment, registry::Node, registry::StringEntry};
 use std::{
@@ -541,15 +541,23 @@ impl Installation {
     pub fn msbuild(&self, arch: &Option<Architecture>) -> Option<MsBuild> {
         let product_info = self.product_info();
         let archs = product_info.architectures();
-        let arch_valid = match arch.as_ref() {
+        let arch = match arch.as_ref() {
             Some(a) if archs.contains(a) => a,
             Some(_) => return None,
             None => archs.first()?,
         };
-        Some(MsBuild::new(
-            product_info.rsvars_bat(arch_valid),
-            arch.clone(),
-        ))
+        Some(MsBuild::new(product_info.rsvars_bat(arch)))
+    }
+
+    pub fn bds(&self, arch: &Option<Architecture>) -> Option<Bds> {
+        let product_info = self.product_info();
+        let archs = product_info.ide_architectures();
+        let arch = match arch.as_ref() {
+            Some(a) if archs.contains(a) => a,
+            Some(_) => return None,
+            None => archs.first()?,
+        };
+        Some(Bds::new(product_info.bds_exe(arch)))
     }
 
     pub fn dcc(&self, clt: &CommandLineTool, arch: &Option<Architecture>) -> Option<Dcc> {

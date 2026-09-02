@@ -23,7 +23,20 @@ fn main() -> anyhow::Result<()> {
             app.installation()?
                 .msbuild(&app.global.architecture)
                 .context("MSBuild.exe not found")?
-                .execute(&app.global.platform, &options)?;
+                .execute(&app.global.architecture, &app.global.platform, &options)?;
+        }
+        Some(Cmd::Bds { options }) => {
+            app.installation()?
+                .bds(&app.global.architecture)
+                .context(format!(
+                    "bds.exe not found{}",
+                    app.global
+                        .architecture
+                        .as_ref()
+                        .map(|a| format!(" ({} not installed)", a.ide_name()))
+                        .unwrap_or_default()
+                ))?
+                .execute(&app.global.architecture, &app.global.platform, &options)?;
         }
         Some(Cmd::Dcc32 { options }) => {
             app.dcc_execute(&CommandLineTool::DCC32, &options)?;
@@ -73,58 +86,79 @@ fn main() -> anyhow::Result<()> {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Build project (*.dproj, *.cbproj, *.groupproj)
+    /// Build project with MSBuild
     #[command(alias = "msbuild")]
     Build {
         #[command(flatten)]
         options: radstudio::msbuild::Options,
     },
+
+    /// Build project with bds.exe
+    ///
+    /// Using bds.exe to build resolves the issue where the Community and Trial editions
+    /// show the prompt: `This version of the product does not support command line compiling`.
+    ///
+    /// This command uses exactly the same command-line options as the `build` command, which uses MSBuild.
+    Bds {
+        #[command(flatten)]
+        options: radstudio::msbuild::Options,
+    },
+
     /// Delphi command-line compiler for Win32
     Dcc32 {
         #[command(flatten)]
         options: radstudio::dcc::Options,
     },
+
     /// Delphi command-line compiler for Win64
     Dcc64 {
         #[command(flatten)]
         options: radstudio::dcc::Options,
     },
+
     /// Delphi command-line compiler for WinARM64EC
     Dccarm64ec {
         #[command(flatten)]
         options: radstudio::dcc::Options,
     },
+
     /// Resource compiler (brcc32.exe)
     #[command(alias = "brcc32")]
     Brcc {
         #[command(flatten)]
         options: radstudio::brcc::Options,
     },
+
     /// Manage IDE environment variables
     Env {
         #[command(subcommand)]
         subcmd: Option<env::EnvCmd>,
     },
+
     /// Manage IDE environment variable PATH
     #[command(aliases = ["envpath", "path"])]
     EnvPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
+
     /// Manage IDE library path
     #[command(aliases = ["librarypath", "lib-path", "libpath"])]
     LibraryPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
+
     /// Manage IDE browsing path
     #[command(alias = "browsingpath")]
     BrowsingPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
+
     /// Print installed RAD Studio product information
     Info,
+
     /// Manage this tool itself
     Self_ {
         #[command(subcommand)]
