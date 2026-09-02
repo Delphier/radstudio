@@ -17,6 +17,7 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 🔍 **Discovery** — automatically detects all installed RAD Studio/Delphi/C++Builder versions from the registry.
 - 🧭 **Version selection** — target an installation by product name (`RAD Studio 13`), codename (`Florence`, `Rio`, `Berlin`), or product version (`13`, `12`, `XE2`), or default to the latest installed version.
 - 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj`/`.groupproj` files with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.).
+- 🧱 **Build via bds.exe** — build the same project files through `bds.exe` instead of MSBuild (same options as `build`), which avoids the "This version of the product does not support command-line compiling" prompt shown by Community/Trial editions.
 - 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches.
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
@@ -66,6 +67,7 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | Command                                     | Description                                                              |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild  |
+| `bds`                                        | Build a project file via `bds.exe` (same options as `build`); avoids the command-line compiling restriction on Community/Trial editions |
 | `dcc32`                                      | Compile Delphi files for Win32 via `DCC32.exe`                  |
 | `dcc64`                                      | Compile Delphi files for Win64 via `DCC64.exe`                  |
 | `dccarm64ec`                                 | Compile Delphi files for WinARM64EC via `DCCARM64EC.exe`        |
@@ -135,6 +137,12 @@ radstudio build MyProject.dproj `
   --CompanyName "My Company" `
   --ProductName "My Product" `
   --LegalCopyright "Copyright © 2026 My Company"
+```
+
+Build with `bds.exe` instead of MSBuild (useful on Community/Trial editions that block command-line compiling via MSBuild):
+
+```
+radstudio bds MyProject.dproj --config Release --platform Win64
 ```
 
 Compile a Delphi source file directly with `DCC32.exe`:
