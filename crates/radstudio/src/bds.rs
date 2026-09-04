@@ -1,4 +1,4 @@
-use crate::{Architecture, Platform};
+use crate::Platform;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -19,11 +19,10 @@ impl Bds {
 
     pub fn execute(
         &self,
-        arch: &Option<Architecture>,
         platform: &Option<Platform>,
         options: &crate::msbuild::Options,
     ) -> crate::Result<ExitStatus> {
-        let temps = crate::msbuild::patcher::patch_project_file(arch, platform, options)?;
+        let temps = crate::msbuild::patcher::patch_project_file(platform, options)?;
         let input: &Path = match &temps {
             Some(temps) => &temps[0],
             None => &options.file,

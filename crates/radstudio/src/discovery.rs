@@ -81,11 +81,11 @@ pub type Personalities = BTreeSet<Personality>;
     clap::ValueEnum,
 )]
 pub enum Architecture {
-    /// x86 toolchain or 32-bit IDE
+    /// 32-bit
     #[value(aliases = ["IntelX86", "32bit", "32-bit"])]
     #[strum(to_string = "x86")]
     X86,
-    /// x64 toolchain or 64-bit IDE
+    /// 64-bit
     #[value(aliases = ["IntelX64", "64bit", "64-bit"])]
     #[strum(to_string = "x64")]
     X64,

@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
             app.installation()?
                 .msbuild(&app.global.architecture)
                 .context("MSBuild.exe not found")?
-                .execute(&app.global.architecture, &app.global.platform, &options)?;
+                .execute(&app.global.platform, &options)?;
         }
         Some(Cmd::Bds { options }) => {
             app.installation()?
@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
                         .map(|a| format!(" ({} not installed)", a.ide_name()))
                         .unwrap_or_default()
                 ))?
-                .execute(&app.global.architecture, &app.global.platform, &options)?;
+                .execute(&app.global.platform, &options)?;
         }
         Some(Cmd::Dcc32 { options }) => {
             app.dcc_execute(&CommandLineTool::DCC32, &options)?;
@@ -196,21 +196,14 @@ struct GlobalOptions {
         long,
         alias = "arch",
         value_name = "ARCH",
-        value_enum,
         ignore_case = true,
         global = true,
         display_order = 1
     )]
     architecture: Option<Architecture>,
+
     /// Specify the target platform
-    #[arg(
-        short,
-        long,
-        value_enum,
-        ignore_case = true,
-        global = true,
-        display_order = 2
-    )]
+    #[arg(short, long, ignore_case = true, global = true, display_order = 2)]
     platform: Option<Platform>,
 }
 

@@ -11,26 +11,37 @@ mod consts {
     pub const EXT_CBPROJ: &'static str = "cbproj";
 
     pub const PROPERTY_GROUP: &'static str = "PropertyGroup";
+    pub const CONDITION: &'static str = "Condition";
 
     pub const CONFIG: &'static str = "Config";
     pub const PLATFORM: &'static str = "Platform";
-    pub const VERINFO_INCLUDE_VERINFO: &'static str = "VerInfo_IncludeVerInfo";
-    pub const VERINFO_KEYS: &'static str = "VerInfo_Keys";
+
     pub const DCC_USE_MSBUILD_EXTERNALLY: &'static str = "DCC_UseMSBuildExternally";
     pub const DCC_PREFERRED_TOOL_ARCHITECTURE: &'static str = "DCC_PreferredToolArchitecture";
+
+    pub const VERINFO_INCLUDE_VERINFO: &'static str = "VerInfo_IncludeVerInfo";
+    pub const VERINFO_KEYS: &'static str = "VerInfo_Keys";
+
     pub const PRE_BUILD_EVENT: &'static str = "PreBuildEvent";
+    pub const POST_BUILD_EVENT: &'static str = "PostBuildEvent";
 }
 use consts::*;
 
 #[derive(Debug, clap::Args)]
 pub struct Options {
-    /// Specify project file path
+    /// Specify project file
     pub file: PathBuf,
+
     /// Specify the configuration name (e.g., Debug or Release).
     ///
     /// If omitted, the default configuration defined in the project file is used.
     #[arg(short, long)]
     pub config: Option<String>,
+
+    /// Defines whether to use 32-bit or 64-bit command-line tools and compilers
+    #[arg(short = 't', long, aliases = ["pta", "tool", "tools", "toolarch", "tool-arch"], value_name = "ARCH", ignore_case = true)]
+    pub preferred_tool_architecture: Option<Architecture>,
+
     #[command(flatten)]
     pub version_info: VersionInfo,
 }
@@ -118,7 +129,6 @@ impl MsBuild {
 
     pub fn execute(
         &self,
-        arch: &Option<Architecture>,
         platform: &Option<Platform>,
         options: &Options,
     ) -> std::io::Result<ExitStatus> {
@@ -132,19 +142,21 @@ impl MsBuild {
         if let Some(platform) = platform {
             args.push(format!("/p:{PLATFORM}={platform}"));
         }
+        if let Some(arch) = &options.preferred_tool_architecture {
+            args.push(format!("/p:{DCC_PREFERRED_TOOL_ARCHITECTURE}={arch}"));
+        }
         let version_info = options.version_info.to_string();
         if !version_info.is_empty() {
             args.push(format!("/p:{VERINFO_INCLUDE_VERINFO}=true"));
             args.push(format!("/p:{VERINFO_KEYS}=\"{version_info}\""));
         }
-        if let Some(arch) = arch {
-            args.push(format!("/p:{DCC_PREFERRED_TOOL_ARCHITECTURE}={arch}"));
-        }
+
         let cmd_arg = format!(
             "\"{}\" && MSBuild.exe {}",
             self.rsvars_bat.display(),
             args.join(" ")
         );
+
         Command::new("cmd.exe")
             .arg("/C")
             .raw_arg(format!("\" {cmd_arg} \""))
