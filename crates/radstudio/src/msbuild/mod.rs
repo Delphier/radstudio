@@ -13,6 +13,17 @@ mod consts {
     pub const PROPERTY_GROUP: &'static str = "PropertyGroup";
     pub const CONDITION: &'static str = "Condition";
 
+    pub const ITEM_GROUP: &'static str = "ItemGroup";
+    pub const PROJECTS: &'static str = "Projects";
+    pub const INCLUDE: &'static str = "Include";
+
+    pub const TARGET: &'static str = "Target";
+    pub const NAME: &'static str = "Name";
+    pub const MSBUILD: &'static str = "MSBuild";
+    pub const CALL_TARGET: &'static str = "CallTarget";
+    pub const TARGETS: &'static str = "Targets";
+    pub const BUILD: &'static str = "Build";
+
     pub const CONFIG: &'static str = "Config";
     pub const PLATFORM: &'static str = "Platform";
 

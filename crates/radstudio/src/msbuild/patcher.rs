@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     ffi::{OsStr, OsString},
     fs::File,
     path::Path,
@@ -9,6 +10,58 @@ use xmltree::{Element, EmitterConfig, XMLNode};
 
 use super::consts::*;
 use crate::Platform;
+
+pub struct FileInfo<'f, 'd> {
+    original: &'f Path,
+    base_dir: Option<&'d Path>,
+}
+
+impl<'f, 'd> FileInfo<'f, 'd> {
+    pub fn new(original: &'f impl AsRef<Path>, base_dir: Option<&'d Path>) -> Self {
+        Self {
+            original: original.as_ref(),
+            base_dir,
+        }
+    }
+
+    fn path(&self) -> Cow<'_, Path> {
+        match self.base_dir {
+            Some(base) if self.original.is_relative() => Cow::Owned(base.join(self.original)),
+            _ => Cow::Borrowed(self.original),
+        }
+    }
+
+    fn parent(&self) -> Cow<'_, Path> {
+        match self.base_dir {
+            Some(base) if self.original.is_relative() => match self.original.parent() {
+                Some(p) => Cow::Owned(base.join(p)),
+                None => Cow::Borrowed(base),
+            },
+            _ => Cow::Borrowed(self.original.parent().unwrap_or_else(|| Path::new(""))),
+        }
+    }
+
+    fn project_name(&self) -> &OsStr {
+        self.original.file_stem().unwrap_or_default()
+    }
+
+    fn extension(&self) -> &OsStr {
+        self.original.extension().unwrap_or_default()
+    }
+
+    fn create_temp_project_file(&self, ext: impl AsRef<OsStr>) -> std::io::Result<NamedTempFile> {
+        let mut prefix = self.project_name().to_owned();
+        prefix.push(".");
+
+        let mut suffix = OsString::from(".");
+        suffix.push(ext);
+
+        tempfile::Builder::new()
+            .prefix(&prefix)
+            .suffix(&suffix)
+            .tempfile_in(self.parent())
+    }
+}
 
 type TempPaths = Vec<TempPath>;
 type PatchItems = Vec<PatchItem>;
@@ -21,20 +74,99 @@ struct PatchItem {
 }
 
 pub fn patch_project_file(
+    file: &FileInfo,
     platform: &Option<Platform>,
     options: &super::Options,
 ) -> crate::Result<Option<TempPaths>> {
-    let ext = options.file.extension().unwrap_or_default();
+    let ext = file.extension();
     if ext.eq_ignore_ascii_case(EXT_GROUPPROJ) {
-        patch_groupproj(platform, options, ext)
+        patch_groupproj(file, platform, options, ext)
     } else if ext.eq_ignore_ascii_case(EXT_DPROJ) || ext.eq_ignore_ascii_case(EXT_CBPROJ) {
-        patch_proj(platform, options, ext)
+        patch_proj(file, platform, options, ext)
     } else {
         Ok(None)
     }
 }
 
+fn patch_groupproj(
+    file: &FileInfo,
+    platform: &Option<Platform>,
+    options: &super::Options,
+    ext: impl AsRef<OsStr>,
+) -> crate::Result<Option<TempPaths>> {
+    let mut root = Element::parse(File::open(file.path())?)?;
+    let Some(ig) = root.get_mut_child(ITEM_GROUP) else {
+        return Ok(None);
+    };
+
+    let base_dir = &file.parent();
+    let mut result = TempPaths::new();
+    let mut projects = Vec::new();
+
+    for node in ig.children.iter_mut() {
+        if let XMLNode::Element(e) = node
+            && e.matches(PROJECTS)
+            && let Some(original) = e.attributes.get(INCLUDE)
+        {
+            let subfile = FileInfo::new(original, Some(base_dir));
+            if let Some(temps) = patch_project_file(&subfile, platform, options)? {
+                let project = temps[0].display().to_string();
+                e.attributes.insert(INCLUDE.to_string(), project.clone());
+                projects.push(project);
+                result.extend(temps);
+            } else {
+                projects.push(original.to_string());
+            }
+        }
+    }
+
+    if result.is_empty() {
+        return Ok(None);
+    }
+
+    remove_elements(&mut root, &[TARGET]);
+    let mut targets = Vec::new();
+    for project in projects {
+        let name = Path::new(&project)
+            .file_stem()
+            .unwrap_or_default()
+            .display()
+            .to_string()
+            .replace(".", "_");
+
+        let mut msbuild = Element::new(MSBUILD);
+        msbuild.attributes.insert(PROJECTS.to_string(), project);
+
+        let mut target = Element::new(TARGET);
+        target.attributes.insert(NAME.to_string(), name.clone());
+        target.children.push(XMLNode::Element(msbuild));
+
+        root.children.push(XMLNode::Element(target));
+        targets.push(name);
+    }
+    let mut call_target = Element::new(CALL_TARGET);
+    call_target
+        .attributes
+        .insert(TARGETS.to_string(), targets.join(";"));
+    let mut target = Element::new(TARGET);
+    target
+        .attributes
+        .insert(NAME.to_string(), BUILD.to_string());
+    target.children.push(XMLNode::Element(call_target));
+    root.children.push(XMLNode::Element(target));
+
+    let output = file.create_temp_project_file(ext)?;
+    xml_write_file(&root, &output)?;
+
+    let output = output.into_temp_path();
+    let local = output.with_added_extension("local");
+    result.insert(0, TempPath::try_from_path(local)?);
+    result.insert(0, output);
+    Ok(Some(result))
+}
+
 fn patch_proj(
+    file: &FileInfo,
     platform: &Option<Platform>,
     options: &super::Options,
     ext: impl AsRef<OsStr>,
@@ -78,7 +210,7 @@ fn patch_proj(
         return Ok(None);
     };
 
-    let mut root = Element::parse(File::open(&options.file)?)?;
+    let mut root = Element::parse(File::open(file.path())?)?;
 
     let mut pg_first = match root.take_child(PROPERTY_GROUP) {
         Some(e) if e.attributes.is_empty() => e,
@@ -116,7 +248,7 @@ fn patch_proj(
     let post_build_user = pg_last
         .and_then(|e| get_prop_value(POST_BUILD_EVENT, e))
         .unwrap_or_default();
-    let project_name = options.file.file_stem().unwrap_or_default().display();
+    let project_name = file.project_name().display();
 
     patches.push(PatchItem {
         name: PRE_BUILD_EVENT,
@@ -157,32 +289,17 @@ fn patch_proj(
         }
     }
 
-    let output = create_temp_project_file(&options.file, ext)?;
     root.children
         .insert(pg_base_index, XMLNode::Element(pg_base));
     root.children.insert(0, XMLNode::Element(pg_first));
-    root.write_with_config(
-        &output,
-        EmitterConfig::new()
-            .perform_indent(true)
-            .indent_string("    ")
-            .write_document_declaration(false),
-    )?;
+    let output = file.create_temp_project_file(ext)?;
+    xml_write_file(&root, &output)?;
 
     let local = output.path().with_added_extension("local");
     Ok(Some(vec![
         output.into_temp_path(),
         TempPath::try_from_path(local)?,
     ]))
-}
-
-fn patch_groupproj(
-    _platform: &Option<Platform>,
-    _options: &super::Options,
-    _ext: impl AsRef<OsStr>,
-) -> crate::Result<Option<TempPaths>> {
-    // TODO
-    Ok(None)
 }
 
 fn get_prop_value(name: &'static str, parent: &Element) -> Option<String> {
@@ -250,18 +367,12 @@ fn remove_elements(parent: &mut Element, names: &[&str]) {
     });
 }
 
-pub(crate) fn create_temp_project_file(
-    original: &Path,
-    ext: impl AsRef<OsStr>,
-) -> std::io::Result<NamedTempFile> {
-    let mut prefix = original.file_stem().unwrap_or_default().to_owned();
-    prefix.push(".");
-
-    let mut suffix = OsString::from(".");
-    suffix.push(ext);
-
-    tempfile::Builder::new()
-        .prefix(&prefix)
-        .suffix(&suffix)
-        .tempfile_in(original.parent().unwrap_or_else(|| Path::new(".")))
+fn xml_write_file(element: &Element, file: impl std::io::Write) -> Result<(), xmltree::Error> {
+    element.write_with_config(
+        file,
+        EmitterConfig::new()
+            .write_document_declaration(false)
+            .perform_indent(true)
+            .indent_string("    "),
+    )
 }

@@ -22,7 +22,8 @@ impl Bds {
         platform: &Option<Platform>,
         options: &crate::msbuild::Options,
     ) -> crate::Result<ExitStatus> {
-        let temps = crate::msbuild::patcher::patch_project_file(platform, options)?;
+        let file = crate::msbuild::patcher::FileInfo::new(&options.file, None);
+        let temps = crate::msbuild::patcher::patch_project_file(&file, platform, options)?;
         let input: &Path = match &temps {
             Some(temps) => &temps[0],
             None => &options.file,
