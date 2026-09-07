@@ -2,13 +2,19 @@
 
 # RAD Studio CLI
 
-A command-line tool for discovering installed [Embarcadero RAD Studio](https://www.embarcadero.com/products/rad-studio) products (Delphi / C++Builder) and working with them — building projects with MSBuild, compiling resource files, managing IDE environment variables and search paths, and more — without having to open the IDE.
+A command-line tool for discovering installed [Embarcadero RAD Studio](https://www.embarcadero.com/products/rad-studio) products (Delphi / C++Builder) and working with them — building projects with MSBuild or bds.exe, compiling resource files, managing IDE environment variables and search paths, and more — without having to open the IDE.
 
 🚧 **This tool is currently under development.** Interfaces and commands may change.
 
 ## Overview
 
-RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI. It can also drive `MSBuild` to build `.dproj`, `.cbproj`, or `.groupproj` project files using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform, invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`), and can read or update the IDE's registry-backed environment variables and search paths.
+RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / Delphi / C++Builder version on your machine (from classic Borland/CodeGear releases through the latest Embarcadero RAD Studio), and exposes that information through a simple CLI.
+
+It can drive `MSBuild` (or, as a fallback for Community/Trial editions, `bds.exe` directly) to build `.dproj`/`.cbproj` project files as well as `.groupproj` project groups — using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform.
+
+When building a project group with bds.exe, each referenced project is patched and built the same way as if built individually, so options like config, platform, version-info stamping and preferred tool architecture are applied consistently across the whole group.
+
+It can also invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`) directly, compile resource script files, and read or update the IDE's registry-backed environment variables and search paths.
 
 This makes it convenient to build Delphi/C++Builder projects and manage IDE configuration from scripts, CI pipelines, AI agents, or any terminal.
 
@@ -16,8 +22,8 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 
 - 🔍 **Discovery** — automatically detects all installed RAD Studio/Delphi/C++Builder versions from the registry.
 - 🧭 **Version selection** — target an installation by product name (`RAD Studio 13`), codename (`Florence`, `Rio`, `Berlin`), or product version (`13`, `12`, `XE2`), or default to the latest installed version.
-- 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj`/`.groupproj` files with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.).
-- 🧱 **Build via bds.exe** — build the same project files through `bds.exe` instead of MSBuild (same options as `build`), which avoids the "This version of the product does not support command-line compiling" prompt shown by Community/Trial editions.
+- 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj` files, or an entire `.groupproj` project group, with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.) and pinning a preferred 32-bit/64-bit command-line tool architecture.
+- 🧱 **Build via bds.exe** — build the same project or project group files through `bds.exe` instead of MSBuild (same options as `build`), which avoids the "This version of the product does not support command-line compiling" prompt shown by Community/Trial editions.
 - 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches.
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
@@ -90,10 +96,12 @@ Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand pr
 
 | Option                      | Description                                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `-a, --architecture <ARCH>` | Toolchain/IDE architecture: `IntelX86` (aliases `x86`, `32bit`) or `IntelX64` (aliases `x64`, `64bit`)                                  |
+| `-a, --architecture <ARCH>` | Toolchain/IDE architecture to use, e.g. `IntelX86` (aliases `x86`, `32bit`) or `IntelX64` (aliases `x64`, `64bit`); applies to all commands |
 | `-p, --platform <PLATFORM>` | Target platform, e.g. `Win32`, `Win64`, `Win64x`, `WinARM64EC`, `OSX64`, `OSXARM64`, `Linux64`, `Android32`, `Android64`, `IOSDevice64` |
 | `-h, --help`                | Print help                                                                                                                                |
 | `-V, --version`             | Print version                                                                                                                             |
+
+`build` and `bds` additionally accept `-t, --preferred-tool-architecture <ARCH>` (aliases `--pta`, `--tool`, `--tools`, `--toolarch`, `--tool-arch`) to pin whether the project's command-line compiler and tools run as 32-bit or 64-bit (`DCC_PreferredToolArchitecture`), independent of the `-a/--architecture` used to locate the toolchain itself.
 
 ### Examples
 
@@ -123,10 +131,10 @@ Build a specific configuration/platform with a chosen RAD Studio version:
 radstudio 13 build MyProject.dproj --config Release --platform Win64
 ```
 
-Build the project using the 64-bit toolchain:
+Force the 64-bit command-line compiler/tools regardless of the toolchain architecture used to locate `MSBuild.exe`:
 
 ```
-radstudio XE8 build MyProject.dproj --arch x64
+radstudio build MyProject.dproj --preferred-tool-architecture x64
 ```
 
 Build and stamp the output with version-info resources:
@@ -143,6 +151,12 @@ Build with `bds.exe` instead of MSBuild (useful on Community/Trial editions that
 
 ```
 radstudio bds MyProject.dproj --config Release --platform Win64
+```
+
+Build every project referenced by a project group, via `bds.exe`:
+
+```
+radstudio bds MyProjectGroup.groupproj --config Release --platform Win64
 ```
 
 Compile a Delphi source file directly with `DCC32.exe`:
