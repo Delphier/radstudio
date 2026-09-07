@@ -1,4 +1,4 @@
-use std::{os::windows::process::CommandExt, path::PathBuf};
+use std::{os::windows::process::CommandExt, path::PathBuf, sync::OnceLock};
 
 #[derive(Debug, clap::Args, serde::Serialize)]
 pub struct Options {
@@ -126,11 +126,27 @@ impl std::fmt::Display for Options {
 
 pub struct Dcc {
     path: PathBuf,
+    supports_command_line_compilation: OnceLock<bool>,
 }
 
 impl Dcc {
     pub fn new(path: PathBuf) -> Self {
-        Self { path }
+        Self {
+            path,
+            supports_command_line_compilation: OnceLock::new(),
+        }
+    }
+
+    pub fn supports_command_line_compilation(&self) -> bool {
+        *self.supports_command_line_compilation.get_or_init(|| {
+            const UNSUPPORTED_MSG: &str =
+                "This version of the product does not support command line compiling.";
+            std::process::Command::new(&self.path)
+                .arg("--version")
+                .output()
+                .map(|o| !String::from_utf8_lossy(&o.stdout).starts_with(UNSUPPORTED_MSG))
+                .unwrap_or_default()
+        })
     }
 
     pub fn execute(&self, options: &Options) -> std::io::Result<std::process::ExitStatus> {

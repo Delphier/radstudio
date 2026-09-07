@@ -6,6 +6,7 @@ use std::{
     fmt::Display,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::OnceLock,
 };
 use strum::{IntoEnumIterator, VariantArray};
 use windows_registry::{CURRENT_USER, Key, Result};
@@ -164,6 +165,21 @@ impl CommandLineTool {
         .map(|a| self.path(product_info, a))
         .find(|path| path.exists())
     }
+
+    fn is_dcc(&self) -> bool {
+        format!("{self:?}").starts_with("DCC")
+    }
+
+    fn which_dcc(
+        &self,
+        product_info: &ProductInfo,
+        arch: &Option<Architecture>,
+    ) -> Option<PathBuf> {
+        match self.is_dcc() {
+            true => self.which(product_info, arch),
+            _ => None,
+        }
+    }
 }
 
 pub type CommandLineTools = BTreeSet<CommandLineTool>;
@@ -222,6 +238,7 @@ pub struct ProductInfo {
     product_name: String,
     personalities: Personalities,
     update_number: u32,
+    supports_command_line_compilation: OnceLock<bool>,
 }
 
 impl ProductInfo {
@@ -272,6 +289,7 @@ impl ProductInfo {
             } else {
                 0
             },
+            supports_command_line_compilation: OnceLock::new(),
         })
     }
 
@@ -402,6 +420,15 @@ impl ProductInfo {
             .collect()
     }
 
+    pub fn supports_command_line_compilation(&self) -> bool {
+        *self.supports_command_line_compilation.get_or_init(|| {
+            match CommandLineTool::iter().find_map(|t| t.which_dcc(self, &None)) {
+                Some(p) => Dcc::new(p).supports_command_line_compilation(),
+                None => false,
+            }
+        })
+    }
+
     pub fn bin_dir(&self, arch: &Architecture) -> PathBuf {
         self.root_dir().join(arch.bin_dir_name())
     }
@@ -493,7 +520,15 @@ impl Display for ProductInfo {
                 "Set",
                 &format!("{}", self.ide_architectures()),
             ])
-            .add_row(vec!["Platforms", "Set", &format!("{}", self.platforms())]);
+            .add_row(vec!["Platforms", "Set", &format!("{}", self.platforms())])
+            .add_row(vec![
+                "Command-line Compilation",
+                "Boolean",
+                match self.supports_command_line_compilation() {
+                    true => "✅",
+                    false => "🚫",
+                },
+            ]);
 
         for arch in self.architectures() {
             let arch_name = format!("{arch}: ");
@@ -561,7 +596,7 @@ impl Installation {
     }
 
     pub fn dcc(&self, clt: &CommandLineTool, arch: &Option<Architecture>) -> Option<Dcc> {
-        clt.which(self.product_info(), arch)
+        clt.which_dcc(self.product_info(), arch)
             .map(|path| Dcc::new(path))
     }
 
