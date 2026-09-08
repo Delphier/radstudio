@@ -549,7 +549,7 @@ impl Display for ProductInfo {
                     &self.bds_exe(&arch).display().to_string(),
                 ])
                 .add_row(vec![
-                    &format!("{arch_name}Command-Line Tools"),
+                    &format!("{arch_name}Command-line Tools"),
                     "Set",
                     &format!("{}", self.command_line_tools(&arch)),
                 ]);

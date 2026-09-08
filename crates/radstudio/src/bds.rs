@@ -16,8 +16,10 @@ impl Bds {
     pub(crate) fn new(path: PathBuf) -> Self {
         Self { path }
     }
+}
 
-    pub fn execute(
+impl crate::msbuild::Execute for Bds {
+    fn execute(
         &self,
         platform: &Option<Platform>,
         options: &crate::msbuild::Options,

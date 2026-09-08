@@ -6,8 +6,9 @@ use anyhow::{Context, bail};
 use clap::{Parser, Subcommand};
 use radstudio::{
     Architecture, Architectures, CommandLineTool, Installation, Installations, Platform, Platforms,
+    msbuild::{self, Execute},
 };
-use std::sync::OnceLock;
+use std::{process::ExitStatus, sync::OnceLock};
 
 const APP_NAME: &'static str = "RAD Studio CLI";
 static INSTALLATIONS: OnceLock<Installations> = OnceLock::new();
@@ -20,51 +21,38 @@ fn main() -> anyhow::Result<()> {
     let app = App::parse();
     match &app.subcmd {
         Some(Cmd::Build { options }) => {
-            app.installation()?
-                .msbuild(&app.global.architecture)
-                .context("MSBuild.exe not found")?
-                .execute(&app.global.platform, &options)?;
+            app.build_execute(true, options)?;
         }
         Some(Cmd::Bds { options }) => {
-            app.installation()?
-                .bds(&app.global.architecture)
-                .context(format!(
-                    "bds.exe not found{}",
-                    app.global
-                        .architecture
-                        .as_ref()
-                        .map(|a| format!(" ({} not installed)", a.ide_name()))
-                        .unwrap_or_default()
-                ))?
-                .execute(&app.global.platform, &options)?;
+            app.build_execute(false, options)?;
         }
         Some(Cmd::Dcc32 { options }) => {
-            app.dcc_execute(&CommandLineTool::DCC32, &options)?;
+            app.dcc_execute(&CommandLineTool::DCC32, options)?;
         }
         Some(Cmd::Dcc64 { options }) => {
-            app.dcc_execute(&CommandLineTool::DCC64, &options)?;
+            app.dcc_execute(&CommandLineTool::DCC64, options)?;
         }
         Some(Cmd::Dccarm64ec { options }) => {
-            app.dcc_execute(&CommandLineTool::DCCARM64EC, &options)?;
+            app.dcc_execute(&CommandLineTool::DCCARM64EC, options)?;
         }
         Some(Cmd::Brcc { options }) => {
-            app.installation()?
+            app.installation()
                 .brcc32(&app.global.architecture)
                 .context(err_clt_not_found(&CommandLineTool::BRCC32))?
-                .execute(&options)?;
+                .execute(options)?;
         }
         Some(Cmd::Env { subcmd }) => {
-            env::EnvCmd::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
+            env::EnvCmd::execute(subcmd, app.installation(), app.ide_architectures()?)?;
         }
         Some(Cmd::EnvPath { subcmd }) => {
-            env::path::execute(subcmd, app.installation()?, app.ide_architectures()?)?;
+            env::path::execute(subcmd, app.installation(), app.ide_architectures()?)?;
         }
         Some(Cmd::LibraryPath { subcmd }) => {
             paths::PathsCmd::execute(
                 "Library Path",
                 Installation::LIBRARY_PATH,
                 subcmd,
-                app.installation()?,
+                app.installation(),
                 app.platforms()?,
             )?;
         }
@@ -73,13 +61,13 @@ fn main() -> anyhow::Result<()> {
                 "Browsing Path",
                 Installation::BROWSING_PATH,
                 subcmd,
-                app.installation()?,
+                app.installation(),
                 app.platforms()?,
             )?;
         }
         Some(Cmd::Info) => print_info(app.name)?,
         Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
-        None => print_info(Some(app.installation()?))?,
+        None => print_info(Some(app.installation()))?,
     };
     Ok(())
 }
@@ -181,6 +169,9 @@ struct App {
     #[arg(verbatim_doc_comment, value_parser = parse_name)]
     name: Option<&'static Installation>,
 
+    #[arg(skip)]
+    installation: OnceLock<&'static Installation>,
+
     #[command(subcommand)]
     subcmd: Option<Cmd>,
 
@@ -208,15 +199,15 @@ struct GlobalOptions {
 }
 
 impl App {
-    fn installation(&self) -> anyhow::Result<&'static Installation> {
-        match self.name {
-            Some(i) => Ok(i),
-            None => latest_installation(),
-        }
+    fn installation(&self) -> &'static Installation {
+        *self.installation.get_or_init(|| match self.name {
+            Some(i) => i,
+            None => latest_installation().unwrap(),
+        })
     }
 
     fn ide_architectures(&self) -> anyhow::Result<Architectures> {
-        let ide_archs = self.installation()?.product_info().ide_architectures();
+        let ide_archs = self.installation().product_info().ide_architectures();
         Ok(match &self.global.architecture {
             Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
             Some(a) => bail!("{} is not installed", a.ide_name()),
@@ -225,7 +216,7 @@ impl App {
     }
 
     fn platforms(&self) -> anyhow::Result<Platforms> {
-        let platforms = self.installation()?.product_info().platforms();
+        let platforms = self.installation().product_info().platforms();
         Ok(match &self.global.platform {
             Some(p) if platforms.contains(p) => std::iter::once(p.to_owned()).collect(),
             Some(p) => bail!("{p} platform is not installed"),
@@ -233,12 +224,47 @@ impl App {
         })
     }
 
+    fn build_execute(
+        &self,
+        is_msbuild: bool,
+        options: &msbuild::Options,
+    ) -> anyhow::Result<ExitStatus> {
+        let mut options = options.clone();
+        let exe: &dyn Execute = if is_msbuild {
+            &self
+                .installation()
+                .msbuild(&self.global.architecture)
+                .context("MSBuild.exe not found")?
+        } else {
+            if !self
+                .installation()
+                .product_info()
+                .supports_command_line_compilation()
+            {
+                options.preferred_tool_architecture = None;
+            };
+            &self
+                .installation()
+                .bds(&self.global.architecture)
+                .context(format!(
+                    "bds.exe not found{}",
+                    self.global
+                        .architecture
+                        .as_ref()
+                        .map(|a| format!(" ({} not installed)", a.ide_name()))
+                        .unwrap_or_default()
+                ))?
+        };
+        let status = exe.execute(&self.global.platform, &options)?;
+        Ok(status)
+    }
+
     fn dcc_execute(
         &self,
         clt: &CommandLineTool,
         options: &radstudio::dcc::Options,
     ) -> anyhow::Result<()> {
-        self.installation()?
+        self.installation()
             .dcc(clt, &self.global.architecture)
             .context(err_clt_not_found(clt))?
             .execute(options)?;

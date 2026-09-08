@@ -38,7 +38,7 @@ mod consts {
 }
 use consts::*;
 
-#[derive(Debug, clap::Args)]
+#[derive(Debug, Clone, clap::Args)]
 pub struct Options {
     /// Specify project file
     pub file: PathBuf,
@@ -129,6 +129,10 @@ impl Display for VersionInfo {
     }
 }
 
+pub trait Execute {
+    fn execute(&self, platform: &Option<Platform>, options: &Options) -> crate::Result<ExitStatus>;
+}
+
 pub struct MsBuild {
     rsvars_bat: PathBuf,
 }
@@ -137,12 +141,10 @@ impl MsBuild {
     pub(crate) fn new(rsvars_bat: PathBuf) -> Self {
         Self { rsvars_bat }
     }
+}
 
-    pub fn execute(
-        &self,
-        platform: &Option<Platform>,
-        options: &Options,
-    ) -> std::io::Result<ExitStatus> {
+impl Execute for MsBuild {
+    fn execute(&self, platform: &Option<Platform>, options: &Options) -> crate::Result<ExitStatus> {
         let mut args = vec![
             format!("\"{}\"", options.file.display()),
             "/t:Build".to_string(),
@@ -168,9 +170,11 @@ impl MsBuild {
             args.join(" ")
         );
 
-        Command::new("cmd.exe")
+        let status = Command::new("cmd.exe")
             .arg("/C")
             .raw_arg(format!("\" {cmd_arg} \""))
-            .status()
+            .status()?;
+
+        Ok(status)
     }
 }
