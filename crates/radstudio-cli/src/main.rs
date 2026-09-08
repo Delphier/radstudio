@@ -196,6 +196,10 @@ struct GlobalOptions {
     /// Specify the target platform
     #[arg(short, long, ignore_case = true, global = true, display_order = 2)]
     platform: Option<Platform>,
+
+    /// No splash screen or no logo
+    #[arg(long, aliases = ["nosplash", "no-logo", "nologo", "ns"], global = true)]
+    no_splash: bool,
 }
 
 impl App {
@@ -230,6 +234,8 @@ impl App {
         options: &msbuild::Options,
     ) -> anyhow::Result<ExitStatus> {
         let mut options = options.clone();
+        options.no_logo = self.global.no_splash;
+
         let exe: &dyn Execute = if is_msbuild {
             &self
                 .installation()

@@ -33,11 +33,14 @@ impl crate::msbuild::Execute for Bds {
         let output = NamedTempFile::new()?.into_temp_path();
 
         println!("Starting bds.exe and building...");
-        let status = Command::new(&self.path)
-            .arg(input)
+        let mut cmd = Command::new(&self.path);
+        cmd.arg(input)
             .arg("-b")
-            .raw_arg(format!(r#"-o"{}""#, output.display()))
-            .status()?;
+            .raw_arg(format!(r#"-o"{}""#, output.display()));
+        if options.no_logo {
+            cmd.arg("-ns");
+        };
+        let status = cmd.status()?;
 
         let mut indent = false;
         let reader = BufReader::new(File::open(output)?);

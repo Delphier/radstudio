@@ -55,6 +55,9 @@ pub struct Options {
 
     #[command(flatten)]
     pub version_info: VersionInfo,
+
+    #[arg(skip)]
+    pub no_logo: bool,
 }
 
 #[derive(Debug, Clone, clap::Args, serde::Serialize)]
@@ -162,6 +165,10 @@ impl Execute for MsBuild {
         if !version_info.is_empty() {
             args.push(format!("/p:{VERINFO_INCLUDE_VERINFO}=true"));
             args.push(format!("/p:{VERINFO_KEYS}=\"{version_info}\""));
+        }
+
+        if options.no_logo {
+            args.push("/nologo".to_string());
         }
 
         let cmd_arg = format!(
