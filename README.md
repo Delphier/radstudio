@@ -12,7 +12,7 @@ RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / D
 
 It can drive `MSBuild` (or, as a fallback for Community/Trial editions, `bds.exe` directly) to build `.dproj`/`.cbproj` project files as well as `.groupproj` project groups — using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform.
 
-When building a project group with bds.exe, each referenced project is patched and built the same way as if built individually, so options like config, platform, version-info stamping and preferred tool architecture are applied consistently across the whole group.
+When building a project group with `bds.exe`, each referenced project is patched and built the same way as if built individually, so options like config, platform, version-info stamping and preferred tool architecture are applied consistently across the whole group.
 
 It can also invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`) directly, compile resource script files, and read or update the IDE's registry-backed environment variables and search paths.
 
@@ -28,9 +28,9 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
 - 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
-- ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, and detected command-line compilers.
+- ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, command-line compilation support, and detected command-line compilers.
 - 📌 **Self-install** — add (or remove) the CLI's directory to your user `PATH` so `radstudio` is available from any terminal.
-- 🚧 **In development** — compile and install `.dpk` package files.
+- 🚧 **In development** — compile and install `.dpk` package files, dcc*.exe fallback to bds.exe.
 
 ## Requirements
 
@@ -72,7 +72,7 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 
 | Command                                     | Description                                                              |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
-| `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild  |
+| `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild; automatically falls back to `bds.exe` if the installation doesn't support command-line compiling (disable with `--no-bds`) |
 | `bds`                                        | Build a project file via `bds.exe` (same options as `build`); avoids the command-line compiling restriction on Community/Trial editions |
 | `dcc32`                                      | Compile Delphi files for Win32 via `DCC32.exe`                  |
 | `dcc64`                                      | Compile Delphi files for Win64 via `DCC64.exe`                  |
@@ -98,6 +98,8 @@ Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand pr
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `-a, --architecture <ARCH>` | Toolchain/IDE architecture to use, e.g. `IntelX86` (aliases `x86`, `32bit`) or `IntelX64` (aliases `x64`, `64bit`); applies to all commands |
 | `-p, --platform <PLATFORM>` | Target platform, e.g. `Win32`, `Win64`, `Win64x`, `WinARM64EC`, `OSX64`, `OSXARM64`, `Linux64`, `Android32`, `Android64`, `IOSDevice64` |
+| `--no-bds` (alias `--nobds`) | For the `build` command, disable the automatic fallback to `bds.exe` on installations that don't support command-line compiling |
+| `--no-splash` (aliases `--nosplash`, `--no-logo`, `--nologo`, `--ns`) | Suppress the bds.exe splash screen or the MSBuild startup logo (`/nologo`) |
 | `-h, --help`                | Print help                                                                                                                                |
 | `-V, --version`             | Print version                                                                                                                             |
 
@@ -157,6 +159,18 @@ Build every project referenced by a project group, via `bds.exe`:
 
 ```
 radstudio bds MyProjectGroup.groupproj --config Release --platform Win64
+```
+
+Build with `build`, but force a hard failure instead of silently falling back to `bds.exe` on editions that don't support command-line compiling:
+
+```
+radstudio build MyProject.dproj --no-bds
+```
+
+Suppress the bds.exe splash screen or the MSBuild startup logo while building:
+
+```
+radstudio build MyProject.dproj --no-splash
 ```
 
 Compile a Delphi source file directly with `DCC32.exe`:
