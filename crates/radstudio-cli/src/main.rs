@@ -21,7 +21,13 @@ fn main() -> anyhow::Result<()> {
     let app = App::parse();
     match &app.subcmd {
         Some(Cmd::Build { options }) => {
-            app.build_execute(true, options)?;
+            app.build_execute(
+                app.installation()
+                    .product_info()
+                    .supports_command_line_compilation()
+                    || app.global.no_bds,
+                options,
+            )?;
         }
         Some(Cmd::Bds { options }) => {
             app.build_execute(false, options)?;
@@ -196,6 +202,10 @@ struct GlobalOptions {
     /// Specify the target platform
     #[arg(short, long, ignore_case = true, global = true, display_order = 2)]
     platform: Option<Platform>,
+
+    /// No fallback to bds.exe when command-line compilation is unsupported
+    #[arg(long, alias = "nobds", global = true)]
+    no_bds: bool,
 
     /// No splash screen or no logo
     #[arg(long, aliases = ["nosplash", "no-logo", "nologo", "ns"], global = true)]
