@@ -4,7 +4,7 @@ use std::{os::windows::process::CommandExt, path::PathBuf, sync::OnceLock};
 pub struct Options {
     /// Specify the filename for compiling
     #[serde(skip)]
-    file: PathBuf,
+    pub file: PathBuf,
 
     /// Do not load default dcc*.cfg file
     #[serde(rename = "--no-config")]
@@ -88,8 +88,8 @@ pub struct Options {
 
     /// Additional options to pass to the compiler
     #[serde(skip)]
-    #[arg(long = "options")]
-    raw: Option<String>,
+    #[arg(last = true)]
+    raw: Vec<String>,
 }
 
 fn format_option(name: impl AsRef<str>, value: impl AsRef<str>) -> String {
@@ -117,9 +117,7 @@ impl std::fmt::Display for Options {
                 };
             }
         }
-        if let Some(s) = &self.raw {
-            options.push(s.clone());
-        }
+        options.extend(self.raw.clone());
         f.write_str(&options.join(" "))
     }
 }

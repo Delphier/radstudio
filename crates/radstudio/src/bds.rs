@@ -16,30 +16,18 @@ impl Bds {
     pub(crate) fn new(path: PathBuf) -> Self {
         Self { path }
     }
-}
 
-impl crate::msbuild::Execute for Bds {
-    fn execute(
-        &self,
-        platform: &Option<Platform>,
-        options: &crate::msbuild::Options,
-    ) -> crate::Result<ExitStatus> {
-        let file = crate::msbuild::patcher::FileInfo::new(&options.file, None);
-        let temps = crate::msbuild::patcher::patch_project_file(&file, platform, options)?;
-        let input: &Path = match &temps {
-            Some(temps) => &temps[0],
-            None => &options.file,
-        };
+    pub fn build(&self, file: impl AsRef<Path>, no_splash: bool) -> crate::Result<ExitStatus> {
         let output = NamedTempFile::new()?.into_temp_path();
-
-        println!("Starting bds.exe and building...");
         let mut cmd = Command::new(&self.path);
-        cmd.arg(input)
+        cmd.arg(file.as_ref())
             .arg("-b")
             .raw_arg(format!(r#"-o"{}""#, output.display()));
-        if options.no_logo {
+        if no_splash {
             cmd.arg("-ns");
         };
+
+        println!("Starting bds.exe and building...");
         let status = cmd.status()?;
 
         let mut indent = false;
@@ -59,5 +47,21 @@ impl crate::msbuild::Execute for Bds {
         }
 
         Ok(status)
+    }
+}
+
+impl crate::msbuild::Execute for Bds {
+    fn execute(
+        &self,
+        platform: &Option<Platform>,
+        options: &crate::msbuild::Options,
+    ) -> crate::Result<ExitStatus> {
+        let file = crate::msbuild::FileInfo::from(&options.file);
+        let temps = crate::msbuild::patch_project_file(&file, platform, options)?;
+        let input: &Path = match &temps {
+            Some(temps) => &temps[0],
+            None => &options.file,
+        };
+        self.build(input, options.no_logo)
     }
 }

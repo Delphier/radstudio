@@ -180,6 +180,10 @@ impl CommandLineTool {
             _ => None,
         }
     }
+
+    pub fn platform(&self) -> Option<Platform> {
+        Platform::iter().find(|p| &p.command_line_tool() == self)
+    }
 }
 
 pub type CommandLineTools = BTreeSet<CommandLineTool>;

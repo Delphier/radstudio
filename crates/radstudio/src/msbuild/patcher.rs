@@ -16,6 +16,15 @@ pub struct FileInfo<'f, 'd> {
     base_dir: Option<&'d Path>,
 }
 
+impl<'f, P: AsRef<Path> + ?Sized> From<&'f P> for FileInfo<'f, '_> {
+    fn from(value: &'f P) -> Self {
+        Self {
+            original: value.as_ref(),
+            base_dir: None,
+        }
+    }
+}
+
 impl<'f, 'd> FileInfo<'f, 'd> {
     pub fn new(original: &'f impl AsRef<Path>, base_dir: Option<&'d Path>) -> Self {
         Self {
@@ -24,14 +33,14 @@ impl<'f, 'd> FileInfo<'f, 'd> {
         }
     }
 
-    fn path(&self) -> Cow<'_, Path> {
+    pub fn path(&self) -> Cow<'_, Path> {
         match self.base_dir {
             Some(base) if self.original.is_relative() => Cow::Owned(base.join(self.original)),
             _ => Cow::Borrowed(self.original),
         }
     }
 
-    fn parent(&self) -> Cow<'_, Path> {
+    pub fn parent(&self) -> Cow<'_, Path> {
         match self.base_dir {
             Some(base) if self.original.is_relative() => match self.original.parent() {
                 Some(p) => Cow::Owned(base.join(p)),
@@ -41,11 +50,11 @@ impl<'f, 'd> FileInfo<'f, 'd> {
         }
     }
 
-    fn project_name(&self) -> &OsStr {
+    pub fn project_name(&self) -> &OsStr {
         self.original.file_stem().unwrap_or_default()
     }
 
-    fn extension(&self) -> &OsStr {
+    pub fn extension(&self) -> &OsStr {
         self.original.extension().unwrap_or_default()
     }
 
@@ -217,7 +226,7 @@ fn patch_proj(
         _ => return Ok(None),
     };
 
-    let pg_base_index = match root.children.iter().position(|node| matches!(node, XMLNode::Element(e) if e.matches(PROPERTY_GROUP) && e.attributes.get(CONDITION).map(String::as_str) == Some("'$(Base)'!=''"))){
+    let pg_base_index = match root.children.iter().position(|node| matches!(node, XMLNode::Element(e) if e.matches(PROPERTY_GROUP) && e.attributes.get(CONDITION).map(String::as_str) == Some(PROPERTY_GROUP_BASE_CONDITION))){
         Some(i) => i,
         None => return Ok(None)
     };
@@ -348,10 +357,14 @@ fn find_property_group<'a>(
     })
 }
 
-fn add_element(parent: &mut Element, name: &str, xmlnode: XMLNode) {
+pub fn add_element(parent: &mut Element, name: &str, node: XMLNode) {
     let mut element = Element::new(name);
-    element.children.push(xmlnode);
+    element.children.push(node);
     parent.children.push(XMLNode::Element(element));
+}
+
+pub fn add_text_element(parent: &mut Element, name: &str, text: String) {
+    add_element(parent, name, XMLNode::Text(text));
 }
 
 fn remove_elements(parent: &mut Element, names: &[&str]) {
@@ -367,7 +380,7 @@ fn remove_elements(parent: &mut Element, names: &[&str]) {
     });
 }
 
-fn xml_write_file(element: &Element, file: impl std::io::Write) -> Result<(), xmltree::Error> {
+pub fn xml_write_file(element: &Element, file: impl std::io::Write) -> Result<(), xmltree::Error> {
     element.write_with_config(
         file,
         EmitterConfig::new()
