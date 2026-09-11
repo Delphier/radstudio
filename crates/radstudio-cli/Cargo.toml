@@ -2,13 +2,18 @@
 name = "radstudio-cli"
 version = "0.8.0"
 edition.workspace = true
+description = "Command-line tool for Embarcadero RAD Studio IDE"
+repository = "https://github.com/Delphier/radstudio"
+homepage = "https://github.com/Delphier/radstudio"
+readme = "../../README.md"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "radstudio"
 path = "src/main.rs"
 
 [dependencies]
-radstudio = {path = "../radstudio"}
+radstudio = {path = "../radstudio", version = "0.8.0" }
 anyhow = "1.0.104"
 clap-cargo = "0.18.3"
 clap.workspace = true
