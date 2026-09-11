@@ -1,6 +1,6 @@
 [package]
 name = "radstudio-cli"
-version = "0.8.0"
+version = "0.8.2"
 edition.workspace = true
 description = "Command-line tool for Embarcadero RAD Studio IDE"
 repository = "https://github.com/Delphier/radstudio"

@@ -1,10 +1,11 @@
 [package]
 name = "radstudio-macros"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 description = "Macros for radstudio crate"
 repository = "https://github.com/Delphier/radstudio"
 homepage = "https://github.com/Delphier/radstudio"
+readme = "README.md"
 license = "MIT OR Apache-2.0"
 
 [lib]
