@@ -3,7 +3,11 @@ use std::process::{Command, ExitStatus};
 use std::{collections::BTreeMap, fmt::Display, os::windows::process::CommandExt, path::PathBuf};
 use unicase::Ascii;
 
-pub mod patcher;
+mod patcher;
+pub use patcher::*;
+
+mod generator;
+pub use generator::*;
 
 mod consts {
     pub const EXT_GROUPPROJ: &'static str = "groupproj";
@@ -11,6 +15,7 @@ mod consts {
     pub const EXT_CBPROJ: &'static str = "cbproj";
 
     pub const PROPERTY_GROUP: &'static str = "PropertyGroup";
+    pub const PROPERTY_GROUP_BASE_CONDITION: &'static str = "'$(Base)'!=''";
     pub const CONDITION: &'static str = "Condition";
 
     pub const ITEM_GROUP: &'static str = "ItemGroup";

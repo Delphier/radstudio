@@ -238,6 +238,19 @@ impl App {
         })
     }
 
+    fn bds(&self) -> anyhow::Result<radstudio::bds::Bds> {
+        self.installation()
+            .bds(&self.global.architecture)
+            .context(format!(
+                "bds.exe not found{}",
+                self.global
+                    .architecture
+                    .as_ref()
+                    .map(|a| format!(" ({} not installed)", a.ide_name()))
+                    .unwrap_or_default()
+            ))
+    }
+
     fn build_execute(
         &self,
         is_msbuild: bool,
@@ -259,17 +272,7 @@ impl App {
             {
                 options.preferred_tool_architecture = None;
             };
-            &self
-                .installation()
-                .bds(&self.global.architecture)
-                .context(format!(
-                    "bds.exe not found{}",
-                    self.global
-                        .architecture
-                        .as_ref()
-                        .map(|a| format!(" ({} not installed)", a.ide_name()))
-                        .unwrap_or_default()
-                ))?
+            &self.bds()?
         };
         let status = exe.execute(&self.global.platform, &options)?;
         Ok(status)
@@ -280,10 +283,27 @@ impl App {
         clt: &CommandLineTool,
         options: &radstudio::dcc::Options,
     ) -> anyhow::Result<()> {
-        self.installation()
-            .dcc(clt, &self.global.architecture)
-            .context(err_clt_not_found(clt))?
-            .execute(options)?;
+        if self
+            .installation()
+            .product_info()
+            .supports_command_line_compilation()
+            || self.global.no_bds
+        {
+            self.installation()
+                .dcc(clt, &self.global.architecture)
+                .context(err_clt_not_found(clt))?
+                .execute(options)?;
+            return Ok(());
+        };
+
+        let curdir = &std::env::current_dir()?;
+        let file = msbuild::FileInfo::new(&options.file, Some(curdir));
+        let temp = msbuild::generator_project_file(&file, &clt.platform(), options)?;
+        let input = match &temp {
+            Some(t) => &t.0,
+            None => &options.file,
+        };
+        self.bds()?.build(input, self.global.no_splash)?;
         Ok(())
     }
 }

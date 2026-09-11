@@ -1,124 +1,127 @@
-use std::{os::windows::process::CommandExt, path::PathBuf, sync::OnceLock};
+use std::{path::PathBuf, sync::OnceLock};
 
-#[derive(Debug, clap::Args, serde::Serialize)]
+pub struct Arg {
+    pub ident: &'static str,
+    pub name: &'static str,
+    pub msbuild: &'static str,
+    pub value: String,
+}
+
+impl Arg {
+    pub fn is_output_dir(&self) -> bool {
+        self.ident.ends_with("output_dir")
+    }
+}
+
+#[derive(Debug, radstudio_macros::DccOptions, clap::Args)]
 pub struct Options {
     /// Specify the filename for compiling
-    #[serde(skip)]
     pub file: PathBuf,
 
     /// Do not load default dcc*.cfg file
-    #[serde(rename = "--no-config")]
+    #[dcc(name = "--no-config")]
     #[arg(long)]
     no_config: bool,
 
     /// Define conditionals
-    #[serde(rename = "-D")]
+    #[dcc(name = "-D", msbuild = "DCC_Define")]
     #[arg(short, long)]
     define: Vec<String>,
 
     /// Unit search directories
-    #[serde(rename = "-U")]
+    //  MSBuild: DCC_UnitSearchPath = All search dirs
+    #[dcc(name = "-U")]
     #[arg(long)]
     unit_search_dirs: Option<String>,
 
     /// Resource search directories
-    #[serde(rename = "-R")]
+    #[dcc(name = "-R")]
     #[arg(long)]
     resource_search_dirs: Option<String>,
 
     /// Include search directories
-    #[serde(rename = "-I")]
+    #[dcc(name = "-I")]
     #[arg(long)]
     include_search_dirs: Option<String>,
 
     /// Build all units
-    #[serde(rename = "-B")]
+    #[dcc(name = "-B")]
     #[arg(short, long)]
     build: bool,
 
     /// Quiet compile
-    #[serde(rename = "-Q")]
+    #[dcc(name = "-Q")]
     #[arg(short, long)]
     quiet: bool,
 
     /// EXE/DLL output directory
-    #[serde(rename = "-E")]
+    #[dcc(name = "-E", msbuild = "DCC_ExeOutput")]
     #[arg(long)]
     output_dir: Option<String>,
 
     /// Unit .dcu output directory
-    #[serde(rename = "-NU")]
+    #[dcc(name = "-NU", msbuild = "DCC_DcuOutput")]
     #[arg(long)]
     unit_output_dir: Option<String>,
 
     /// Package .bpl output directory
-    #[serde(rename = "-LE")]
+    #[dcc(name = "-LE", msbuild = "DCC_BplOutput")]
     #[arg(long)]
     package_bpl_output_dir: Option<String>,
 
     /// Package .dcp output directory
-    #[serde(rename = "-LN")]
+    #[dcc(name = "-LN", msbuild = "DCC_DcpOutput")]
     #[arg(long)]
     package_dcp_output_dir: Option<String>,
 
     /// Generate all C++Builder files
-    #[serde(rename = "-JL")]
+    //  MSBuild: <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
+    #[dcc(name = "-JL")]
     #[arg(long)]
-    cpp: bool,
+    pub cpp: bool,
 
     /// Generate COFF-format C++ files
-    #[serde(rename = "-jf:coffi")]
+    #[dcc(name = "-jf:coffi")]
     #[arg(long)]
     cpp_win64x: bool,
 
     /// C++ .bpi output directory
-    #[serde(rename = "-NB")]
+    #[dcc(name = "-NB", msbuild = "DCC_BpiOutput")]
     #[arg(long)]
     cpp_bpi_output_dir: Option<String>,
 
     /// C++ .hpp output directory
-    #[serde(rename = "-NH")]
+    #[dcc(name = "-NH", msbuild = "DCC_HppOutput")]
     #[arg(long)]
     cpp_hpp_output_dir: Option<String>,
 
     /// C++ .obj/.lib output directory
-    #[serde(rename = "-NO")]
+    #[dcc(name = "-NO", msbuild = "DCC_ObjOutput")]
     #[arg(long)]
     cpp_obj_output_dir: Option<String>,
 
     /// Additional options to pass to the compiler
-    #[serde(skip)]
+    //  MSBuild: DCC_AdditionalSwitches
     #[arg(last = true)]
-    raw: Vec<String>,
+    pub raw: Vec<String>,
 }
 
-fn format_option(name: impl AsRef<str>, value: impl AsRef<str>) -> String {
-    format!(r#"{}"{}""#, name.as_ref(), value.as_ref())
-}
-impl std::fmt::Display for Options {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut options = vec![
-            "-AGenerics.Collections=System.Generics.Collections;Generics.Defaults=System.Generics.Defaults;WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE".to_string(),
-            "-NSWinapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;IBX;VclTee".to_string(),
-        ];
-        if let Ok(serde_json::Value::Object(obj)) = serde_json::to_value(self) {
-            for (k, v) in obj {
-                match v {
-                    serde_json::Value::Bool(true) => options.push(k),
-                    serde_json::Value::String(s) => options.push(format_option(k, s)),
-                    serde_json::Value::Array(a) => {
-                        for i in a {
-                            if let serde_json::Value::String(s) = i {
-                                options.push(format_option(&k, s))
-                            }
-                        }
-                    }
-                    _ => {}
-                };
-            }
+impl Options {
+    pub fn search_dirs(&self) -> Option<String> {
+        let dirs: Vec<_> = [
+            &self.unit_search_dirs,
+            &self.resource_search_dirs,
+            &self.include_search_dirs,
+        ]
+        .into_iter()
+        .filter_map(|o| o.as_deref())
+        .collect();
+
+        if dirs.is_empty() {
+            None
+        } else {
+            Some(dirs.join(";"))
         }
-        options.extend(self.raw.clone());
-        f.write_str(&options.join(" "))
     }
 }
 
@@ -148,9 +151,26 @@ impl Dcc {
     }
 
     pub fn execute(&self, options: &Options) -> std::io::Result<std::process::ExitStatus> {
-        std::process::Command::new(&self.path)
-            .arg(&options.file)
-            .raw_arg(&options.to_string())
-            .status()
+        let defaults = [
+            "-AGenerics.Collections=System.Generics.Collections;Generics.Defaults=System.Generics.Defaults;WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE",
+            "-NSWinapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;IBX;VclTee",
+        ];
+        let mut cmd = std::process::Command::new(&self.path);
+        cmd.arg(&options.file).args(defaults);
+
+        for arg in options.data() {
+            if !arg.name.is_empty() {
+                if arg.value.is_empty() {
+                    cmd.arg(&arg.name);
+                } else {
+                    cmd.arg(format!("{}\"{}\"", arg.name, arg.value));
+                }
+            }
+            if arg.is_output_dir() {
+                std::fs::create_dir_all(arg.value)?;
+            }
+        }
+
+        cmd.args(&options.raw).status()
     }
 }

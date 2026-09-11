@@ -36,21 +36,21 @@ pub fn derive_options_data(input: DeriveInput) -> syn::Result<proc_macro2::Token
         };
         let ty_name = ty.path.segments.last().unwrap().ident.to_string();
 
+        let arg = quote! {ident: #field_name, name: #name, msbuild: #msbuild};
         let block = match ty_name.as_str() {
             "Option" => quote! {
-                let value = self.#field_ident.clone().unwrap_or_default();
-                if !value.is_empty() {
-                    result.push(Arg {ident: #field_name, name: #name, msbuild: #msbuild, value});
+                if let Some(s) = &self.#field_ident {
+                    result.push(Arg {#arg, value: s.clone()});
                 };
             },
             "bool" => quote! {
                 if self.#field_ident {
-                    result.push(Arg {ident: #field_name, name: #name, msbuild: #msbuild, value: String::new()});
+                    result.push(Arg {#arg, value: String::new()});
                 };
             },
             "Vec" => quote! {
                 if !self.#field_ident.is_empty() {
-                    result.push(Arg {ident: #field_name, name: #name, msbuild: #msbuild, value: self.#field_ident.join(";")});
+                    result.push(Arg {#arg, value: self.#field_ident.join(";")});
                 };
             },
             _ => panic!("Unsupported field type: {ty_name}"),
