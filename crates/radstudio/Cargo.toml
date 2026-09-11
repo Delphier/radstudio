@@ -2,9 +2,14 @@
 name = "radstudio"
 version = "0.8.0"
 edition.workspace = true
+description = "A utility library for the Embarcadero RAD Studio IDE"
+repository = "https://github.com/Delphier/radstudio"
+homepage = "https://github.com/Delphier/radstudio"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
-radstudio-macros = { path = "../radstudio-macros" }
+radstudio-macros = { path = "../radstudio-macros", version = "0.1.0" }
 strum = { version = "0.28.0", features = ["derive"] }
 unicase = "2.9.0"
 serde = { version = "1.0.229", features = ["derive"] }
