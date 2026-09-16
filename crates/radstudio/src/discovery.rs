@@ -1,6 +1,7 @@
 use crate::{bds::Bds, brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
-use envz::{Environment, registry::Node, registry::StringEntry};
+use envz::Environment;
+use envz::registry::{HKCU, Node, StringEntry};
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -9,7 +10,6 @@ use std::{
     sync::OnceLock,
 };
 use strum::{IntoEnumIterator, VariantArray};
-use windows_registry::{CURRENT_USER, Key, Result};
 
 pub struct BTreeSet<T>(std::collections::BTreeSet<T>);
 
@@ -246,23 +246,21 @@ pub struct ProductInfo {
 }
 
 impl ProductInfo {
-    pub const REG_ROOT: &Key = CURRENT_USER;
-
-    fn reg_key_with(parent: impl AsRef<Path>, version: impl AsRef<str>) -> Result<Key> {
-        Self::REG_ROOT.open(parent.as_ref().join(version.as_ref()).display().to_string())
+    fn reg_node_with(parent: impl AsRef<Path>, version: impl AsRef<str>) -> envz::Result<Node> {
+        HKCU.open(parent.as_ref().join(version.as_ref()).display().to_string())
     }
 
-    fn reg_key(&self) -> Result<Key> {
-        Self::reg_key_with(&self.reg_parent, self.version())
+    fn reg_node(&self) -> envz::Result<Node> {
+        Self::reg_node_with(&self.reg_parent, self.version())
     }
 
-    fn new(reg_parent: PathBuf, version: String) -> Result<Self> {
-        let reg_key = Self::reg_key_with(&reg_parent, &version)?;
+    fn new(reg_parent: PathBuf, version: String) -> envz::Result<Self> {
+        let reg_node = Self::reg_node_with(&reg_parent, &version)?;
         let product_name;
         let personalities;
-        if let Ok(key) = reg_key.open("Personalities") {
-            product_name = key.get_string("").unwrap_or_default();
-            personalities = key
+        if let Ok(node) = reg_node.open("Personalities") {
+            product_name = node.get("")?.unwrap_or_default().display().to_string();
+            personalities = node
                 .values()?
                 .filter_map(|(n, _)| Personality::from_str(&n).ok())
                 .collect()
@@ -272,7 +270,7 @@ impl ProductInfo {
         };
 
         Ok(Self {
-            globals: reg_key
+            globals: reg_node
                 .values()?
                 .map(|(n, v)| (n, v.try_into().unwrap_or_default()))
                 .collect(),
@@ -281,9 +279,11 @@ impl ProductInfo {
             version,
             product_name,
             personalities,
-            update_number: if let Ok(key) = reg_key.open("InstalledUpdates") {
-                key.get_string("Main Product Update")
+            update_number: if let Ok(node) = reg_node.open("InstalledUpdates") {
+                node.get("Main Product Update")?
                     .unwrap_or_default()
+                    .display()
+                    .to_string()
                     .split("Update")
                     .nth(1)
                     .unwrap_or_default()
@@ -567,7 +567,7 @@ pub struct Installation {
 }
 
 impl Installation {
-    fn new(reg_parent: PathBuf, version: String) -> Result<Self> {
+    fn new(reg_parent: PathBuf, version: String) -> envz::Result<Self> {
         Ok(Self {
             product_info: ProductInfo::new(reg_parent, version)?,
         })
@@ -624,7 +624,7 @@ impl Installation {
 
     pub fn environment_variables(&self, arch: &Architecture) -> envz::Result<Environment> {
         Environment::create(
-            &self.product_info().reg_key()?,
+            &self.product_info().reg_node()?,
             format!("Environment Variables{}", arch.reg_name_suffix()),
             false,
         )
@@ -640,10 +640,9 @@ impl Installation {
     };
 
     pub fn library(&self, platform: &Platform) -> envz::Result<Node> {
-        Node::create(
-            &self.product_info().reg_key()?,
-            format!("Library\\{platform}"),
-        )
+        self.product_info()
+            .reg_node()?
+            .create(format!("Library\\{platform}"))
     }
 }
 
@@ -690,7 +689,7 @@ impl Installations {
     }
 }
 
-pub fn find() -> Result<Installations> {
+pub fn find() -> envz::Result<Installations> {
     let mut installs = Installations::new();
     #[cfg(windows)]
     {
@@ -699,7 +698,7 @@ pub fn find() -> Result<Installations> {
             r"Software\CodeGear\BDS",
             r"Software\Embarcadero\BDS",
         ] {
-            let Ok(bds) = CURRENT_USER.open(path) else {
+            let Ok(bds) = HKCU.open(path) else {
                 continue;
             };
             for version in bds.keys()? {
