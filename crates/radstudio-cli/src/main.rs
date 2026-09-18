@@ -1,4 +1,5 @@
 mod env;
+mod package;
 mod paths;
 mod self_;
 
@@ -40,6 +41,9 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Cmd::Dccarm64ec { options }) => {
             app.dcc_execute(&CommandLineTool::DCCARM64EC, options)?;
+        }
+        Some(Cmd::Package { subcmd }) => {
+            subcmd.execute(&app)?;
         }
         Some(Cmd::Brcc { options }) => {
             app.installation()
@@ -114,6 +118,12 @@ enum Cmd {
     Dccarm64ec {
         #[command(flatten)]
         options: radstudio::dcc::Options,
+    },
+
+    /// Manage packages
+    Package {
+        #[command(subcommand)]
+        subcmd: package::PackageCmd,
     },
 
     /// Resource compiler (brcc32.exe)
@@ -191,7 +201,7 @@ struct GlobalOptions {
     #[arg(
         short,
         long,
-        alias = "arch",
+        aliases = ["arch", "ide"],
         value_name = "ARCH",
         ignore_case = true,
         global = true,
@@ -220,11 +230,21 @@ impl App {
         })
     }
 
+    fn ide_architecture(&self) -> anyhow::Result<Architecture> {
+        let mut ide_archs = self.installation().product_info().ide_architectures();
+        Ok(match &self.global.architecture {
+            Some(a) if ide_archs.contains(a) => a.to_owned(),
+            Some(a) => bail!(err_ide_not_installed(a)),
+            None if ide_archs.len() == 1 => ide_archs.pop_first().unwrap(),
+            None => bail!("IDE architecture must be specified"),
+        })
+    }
+
     fn ide_architectures(&self) -> anyhow::Result<Architectures> {
         let ide_archs = self.installation().product_info().ide_architectures();
         Ok(match &self.global.architecture {
             Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
-            Some(a) => bail!("{} is not installed", a.ide_name()),
+            Some(a) => bail!(err_ide_not_installed(a)),
             None => ide_archs,
         })
     }
@@ -318,6 +338,10 @@ fn parse_name(name: &str) -> Result<&'static Installation, String> {
     installations()
         .find_by_name(name)
         .ok_or("no installed RAD Studio matched".to_string())
+}
+
+fn err_ide_not_installed(arch: &Architecture) -> String {
+    format!("{} is not installed", arch.ide_name())
 }
 
 fn err_clt_not_found(clt: &CommandLineTool) -> String {

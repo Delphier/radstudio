@@ -3,6 +3,7 @@ pub mod brcc;
 pub mod consts;
 pub mod dcc;
 pub mod msbuild;
+pub mod package;
 
 mod discovery;
 
@@ -19,6 +20,8 @@ pub enum Error {
     XmlParse(#[from] xmltree::ParseError),
     #[error(transparent)]
     XmlWrite(#[from] xmltree::Error),
+    #[error(transparent)]
+    Regex(#[from] regex::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

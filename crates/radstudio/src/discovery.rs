@@ -2,6 +2,7 @@ use crate::{bds::Bds, brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use envz::Environment;
 use envz::registry::{HKCU, Node, StringEntry};
+use std::ffi::OsStr;
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -50,6 +51,12 @@ impl<T> std::ops::Deref for BTreeSet<T> {
     type Target = std::collections::BTreeSet<T>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T> std::ops::DerefMut for BTreeSet<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -111,6 +118,13 @@ impl Architecture {
         match self {
             Architecture::X86 => "32-bit IDE",
             Architecture::X64 => "64-bit IDE",
+        }
+    }
+
+    pub fn platform(&self) -> Platform {
+        match self {
+            Self::X86 => Platform::Win32,
+            Self::X64 => Platform::Win64,
         }
     }
 }
@@ -216,7 +230,7 @@ pub enum Platform {
 }
 
 impl Platform {
-    fn command_line_tool(&self) -> CommandLineTool {
+    pub fn command_line_tool(&self) -> CommandLineTool {
         match self {
             Platform::Win32 => CommandLineTool::DCC32,
             Platform::Win64 => CommandLineTool::DCC64,
@@ -643,6 +657,31 @@ impl Installation {
         self.product_info()
             .reg_node()?
             .create(format!("Library\\{platform}"))
+    }
+
+    pub fn known_packages(&self, arch: &Architecture) -> envz::Result<Node> {
+        self.product_info()
+            .reg_node()?
+            .create(format!("Known Packages{}", arch.reg_name_suffix()))
+    }
+
+    pub fn register_package(
+        &self,
+        arch: &Architecture,
+        bpl_path: impl AsRef<Path>,
+        description: impl AsRef<OsStr>,
+    ) -> envz::Result<()> {
+        self.known_packages(arch)?
+            .set(bpl_path.as_ref().display().to_string(), description)
+    }
+
+    pub fn unregister_pacakge(
+        &self,
+        arch: &Architecture,
+        bpl_path: impl AsRef<Path>,
+    ) -> envz::Result<()> {
+        self.known_packages(arch)?
+            .remove(bpl_path.as_ref().display().to_string())
     }
 }
 

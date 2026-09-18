@@ -67,7 +67,7 @@ pub struct Options {
     /// Package .bpl output directory
     #[dcc(name = "-LE", msbuild = "DCC_BplOutput")]
     #[arg(long)]
-    package_bpl_output_dir: Option<String>,
+    pub package_bpl_output_dir: Option<String>,
 
     /// Package .dcp output directory
     #[dcc(name = "-LN", msbuild = "DCC_DcpOutput")]
