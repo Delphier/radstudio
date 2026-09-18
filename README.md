@@ -10,7 +10,7 @@ RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / D
 
 It can drive `MSBuild` to build `.dproj`/`.cbproj` project files as well as `.groupproj` project groups, using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform. 
 
-It can also invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`) directly, compile resource script files, and read or update the IDE's registry-backed environment variables and search paths.
+It can also invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`) directly, compile resource script files, compile, install and register/unregister packages, and read or update the IDE's registry-backed environment variables and search paths.
 
 RAD Studio CLI detects whether the targeted installation actually supports command-line compilation (Community and Trial editions typically don't), and both the `build` command and the direct `dcc32`/`dcc64`/`dccarm64ec` compiler commands automatically fall back to driving `bds.exe` instead when it doesn't — avoiding the "This version of the product does not support command line compiling" prompt without any extra flags.
 
@@ -25,6 +25,7 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj` files, or an entire `.groupproj` project group, with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.) and pinning a preferred 32-bit/64-bit command-line tool architecture. Automatically falls back to `bds.exe` on installations that don't support command-line compiling, unless `--no-bds` is passed.
 - 🧱 **Build via bds.exe** — build the same project or project group files through `bds.exe` instead of MSBuild (same options as `build`), which avoids the "This version of the product does not support command-line compiling" prompt shown by Community/Trial editions. Used automatically as a fallback by `build` and by `dcc32`/`dcc64`/`dccarm64ec`, or invoke it directly with the `bds` command.
 - 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches; falls back to `bds.exe` automatically on editions without command-line compiling support.
+- 🗃️ **Package management** — compile a `.dpk` package for the IDE's own architecture (`package compile`), optionally registering it as a design-time package right after compiling (`--install`), or register/unregister an already-built `.bpl` as a design-time package directly (`package register`/`package unregister`).
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
 - 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
@@ -76,6 +77,7 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | `dcc32`                                      | Compile Delphi files for Win32 via `DCC32.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
 | `dcc64`                                      | Compile Delphi files for Win64 via `DCC64.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
 | `dccarm64ec`                                 | Compile Delphi files for WinARM64EC via `DCCARM64EC.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
+| `package`                                    | Compile a `.dpk` package and optionally install it, or register/unregister a design-time package |
 | `brcc` (alias `brcc32`)                      | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
 | `env`                                        | View, set, or remove IDE environment variables                          |
 | `env-path` (alias `path`)                     | View, add, insert, or remove entries in the IDE environment `PATH`      |
@@ -90,6 +92,12 @@ Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand pr
 - `envpath`, `librarypath`, `browsingpath` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
 
 `dcc32`, `dcc64`, and `dccarm64ec` take a source `<FILE>` plus compiler options: `--no-config` (skip the default `dcc*.cfg`), `-D/--define <NAME>` (repeatable), `--unit-search-dirs`/`--resource-search-dirs`/`--include-search-dirs <DIRS>`, `-B/--build` (rebuild all units), `-Q/--quiet`, `--output-dir`/`--unit-output-dir`/`--package-bpl-output-dir`/`--package-dcp-output-dir <DIR>`, C++Builder-related flags (`--cpp`, `--cpp-win64x`, `--cpp-bpi-output-dir`, `--cpp-hpp-output-dir`, `--cpp-obj-output-dir`), and a trailing `-- <ARGS>` to pass any additional raw compiler switches straight through to the compiler (e.g. `radstudio dcc64 MyProject.dpr -- -W-SYMBOL_DEPRECATED`).
+
+`package` has three subcommands:
+
+- `package compile <FILE>` — compile a `.dpk` package, using the same compiler options as `dcc32`/`dcc64` (including the `bds.exe` fallback). The compiler is chosen from the current IDE architecture (`-a/--architecture`, or the installation's only IDE architecture if it has just one). Add `--install` to register the freshly built `.bpl` (found via `--package-bpl-output-dir`) as a design-time package immediately after compiling, using the `{$DESCRIPTION '...'}` directive from the source as its description.
+- `package register <BPL_PATH> [DESCRIPTION]` — register an existing `.bpl` as a design-time package for the current IDE architecture.
+- `package unregister <BPL_PATH>` — remove a `.bpl` from the design-time package registry for the current IDE architecture.
 
 ### Options
 
@@ -194,6 +202,24 @@ Compile on a Community/Trial edition (automatically falls back to `bds.exe`, no 
 
 ```
 radstudio dcc64 MyPackage370.dpk
+```
+
+Compile a design-time package and install it into the IDE in one step:
+
+```
+radstudio package compile MyPackage370.dpk --install --package-bpl-output-dir .\bpl --package-dcp-output-dir .\dcp
+```
+
+Register an already-built `.bpl` as a design-time package:
+
+```
+radstudio package register "C:\MyPackage\bpl\MyPackage370.bpl" "My custom components"
+```
+
+Unregister a design-time package:
+
+```
+radstudio package unregister "C:\MyPackage\bpl\MyPackage370.bpl" --ide=64bit
 ```
 
 Compile a resource script into a `.res` file:
