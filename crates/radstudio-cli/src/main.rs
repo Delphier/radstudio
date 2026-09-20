@@ -120,7 +120,7 @@ enum Cmd {
         options: radstudio::dcc::Options,
     },
 
-    /// Manage packages
+    /// Manage design-time packages
     Package {
         #[command(subcommand)]
         subcmd: package::PackageCmd,

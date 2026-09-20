@@ -1,10 +1,11 @@
-use std::path::PathBuf;
-
 use crate::App;
+use anyhow::Context;
+use radstudio::package::PackageInfo;
+use std::path::PathBuf;
 
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum PackageCmd {
-    /// Compile a package and optionally install it
+    /// Compile a design-time package and optionally install it
     Compile {
         /// Specify weather to install the package into the IDE
         #[arg(long)]
@@ -13,7 +14,7 @@ pub(crate) enum PackageCmd {
         options: radstudio::dcc::Options,
     },
 
-    /// Register a designtime package
+    /// Register a design-time package
     Register {
         /// Specify the full path of the bpl file to register
         bpl_path: PathBuf,
@@ -21,7 +22,7 @@ pub(crate) enum PackageCmd {
         description: Option<String>,
     },
 
-    /// Unregister a designtime package
+    /// Unregister a design-time package
     Unregister {
         /// Specify the full path of the bpl file to unregister
         bpl_path: PathBuf,
@@ -31,7 +32,17 @@ pub(crate) enum PackageCmd {
 impl PackageCmd {
     pub fn execute(&self, app: &App) -> anyhow::Result<()> {
         let installation = app.installation();
-        let arch = &app.ide_architecture()?;
+        let arch = &match &app.global.platform {
+            Some(p) if app.global.architecture.is_none() => installation
+                .product_info()
+                .ide_architectures()
+                .into_iter()
+                .find(|a| &a.platform() == p)
+                .context(format!(
+                    "the current IDE does not support {p} design-time packages"
+                ))?,
+            _ => app.ide_architecture()?,
+        };
 
         match self {
             Self::Compile { install, options } => {
@@ -42,9 +53,7 @@ impl PackageCmd {
                 {
                     let bpl_output_dir = std::env::current_dir()?.join(bpl_output_dir);
                     let bpl_path = bpl_output_dir.join(file_name).with_extension("bpl");
-                    let description =
-                        radstudio::package::PackageInfo::parse(&options.file)?.description;
-
+                    let description = PackageInfo::from_file(&options.file)?.description;
                     installation.register_package(arch, bpl_path, description)?;
                 }
             }
