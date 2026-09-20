@@ -33,6 +33,10 @@ fn main() -> anyhow::Result<()> {
         Some(Cmd::Bds { options }) => {
             app.build_execute(false, options)?;
         }
+        Some(Cmd::Dcc { options }) => match &app.global.platform {
+            Some(p) => app.dcc_execute(&p.command_line_tool(), options)?,
+            None => bail!("the platform must be specified"),
+        },
         Some(Cmd::Dcc32 { options }) => {
             app.dcc_execute(&CommandLineTool::DCC32, options)?;
         }
@@ -100,6 +104,12 @@ enum Cmd {
     Bds {
         #[command(flatten)]
         options: radstudio::msbuild::Options,
+    },
+
+    /// Delphi command-line compiler
+    Dcc {
+        #[command(flatten)]
+        options: radstudio::dcc::Options,
     },
 
     /// Delphi command-line compiler for Win32
