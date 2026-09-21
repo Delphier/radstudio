@@ -1,6 +1,6 @@
 [package]
 name = "radstudio-macros"
-version = "0.1.1"
+version = "0.2.0"
 edition.workspace = true
 description = "Macros for radstudio crate"
 repository = "https://github.com/Delphier/radstudio"
@@ -14,4 +14,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
-syn = "3.0.5"
+syn = { version = "3.0.5", features = ["full"] }
