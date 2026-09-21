@@ -3,15 +3,23 @@ use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use heck::ToTitleCase;
 use radstudio::{Installation, ProductInfo};
 
-pub fn print(installation: Option<&Installation>) -> anyhow::Result<()> {
+pub fn print(installation: Option<&Installation>, json: bool) -> anyhow::Result<()> {
     match installation {
-        Some(i) => print_installation(i, None)?,
+        Some(i) => print_installation(i, None, json)?,
         None => {
             if INSTALLATIONS.len() == 1 {
-                print_installation(&LATEST_INSTALLATION, None)?;
+                print_installation(&LATEST_INSTALLATION, None, json)?;
             } else {
-                for (id, i) in INSTALLATIONS.iter().enumerate() {
-                    print_installation(i, Some(id + 1))?;
+                if json {
+                    let data = INSTALLATIONS
+                        .iter()
+                        .map(|i| i.product_info().data())
+                        .collect::<Result<Vec<_>, _>>()?;
+                    println!("{}", serde_json::to_string_pretty(&data)?);
+                } else {
+                    for (id, i) in INSTALLATIONS.iter().enumerate() {
+                        print_installation(i, Some(id + 1), false)?;
+                    }
                 }
             }
         }
@@ -19,10 +27,19 @@ pub fn print(installation: Option<&Installation>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn print_installation(installation: &Installation, id: Option<usize>) -> anyhow::Result<()> {
-    id.inspect(|id| print!("{id}. "));
-    println!("{}", installation.product_info().display_name());
-    print_product_info(installation.product_info())
+fn print_installation(
+    installation: &Installation,
+    id: Option<usize>,
+    json: bool,
+) -> anyhow::Result<()> {
+    if json {
+        let data = serde_json::to_string_pretty(&vec![installation.product_info().data()?])?;
+        Ok(println!("{data}"))
+    } else {
+        id.inspect(|id| print!("{id}. "));
+        println!("{}", installation.product_info().display_name());
+        print_product_info(installation.product_info())
+    }
 }
 
 fn print_product_info(pi: &ProductInfo) -> anyhow::Result<()> {

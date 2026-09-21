@@ -106,9 +106,9 @@ fn main() -> anyhow::Result<()> {
             };
             print!("{output}");
         }
-        Some(Cmd::Info) => info::print(app.name)?,
+        Some(Cmd::Info) => info::print(app.name, app.global.json)?,
         Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
-        None => info::print(Some(app.installation()))?,
+        None => info::print(Some(app.installation()), app.global.json)?,
     };
     Ok(())
 }

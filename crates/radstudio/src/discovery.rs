@@ -580,10 +580,6 @@ impl Installations {
         self.items.push(value);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Installation> {
-        self.items.iter()
-    }
-
     pub fn find_by_name(&self, name: &str) -> Option<&Installation> {
         self.items.iter().find(|i| {
             i.product_info.product_name().eq_ignore_ascii_case(name)
@@ -603,10 +599,6 @@ impl Installations {
 
     pub fn latest(&self) -> Option<&Installation> {
         self.items.last()
-    }
-
-    pub fn count(&self) -> usize {
-        self.items.len()
     }
 
     pub fn select(&self, message: impl AsRef<str>, multi: bool) -> Vec<&Installation> {
