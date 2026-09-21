@@ -1,4 +1,5 @@
 mod env;
+mod info;
 mod package;
 mod paths;
 mod self_;
@@ -9,14 +10,23 @@ use radstudio::{
     Architecture, Architectures, CommandLineTool, Installation, Installations, Platform, Platforms,
     msbuild::{self, Execute},
 };
-use std::{process::ExitStatus, sync::OnceLock};
+use std::{
+    process::ExitStatus,
+    sync::{LazyLock, OnceLock},
+};
 
-const APP_NAME: &'static str = "RAD Studio CLI";
-static INSTALLATIONS: OnceLock<Installations> = OnceLock::new();
+const APP_NAME: &str = "RAD Studio CLI";
 
-fn installations() -> &'static Installations {
-    INSTALLATIONS.get_or_init(|| radstudio::find().unwrap())
-}
+static INSTALLATIONS: LazyLock<Installations> = LazyLock::new(|| {
+    let installations = radstudio::find().unwrap();
+    if installations.is_empty() {
+        panic!("No RAD Studio installations found")
+    }
+    installations
+});
+
+static LATEST_INSTALLATION: LazyLock<&Installation> =
+    LazyLock::new(|| &INSTALLATIONS[INSTALLATIONS.len() - 1]);
 
 fn main() -> anyhow::Result<()> {
     let app = App::parse();
@@ -79,9 +89,26 @@ fn main() -> anyhow::Result<()> {
                 app.platforms()?,
             )?;
         }
-        Some(Cmd::Info) => print_info(app.name)?,
+        Some(Cmd::Select { message, multi }) => {
+            let installations = INSTALLATIONS.select(message, *multi);
+            let output = if app.global.json {
+                let data = installations
+                    .iter()
+                    .map(|i| i.product_info().data())
+                    .collect::<Result<Vec<_>, _>>()?;
+                serde_json::to_string_pretty(&data)?
+            } else {
+                installations
+                    .iter()
+                    .map(|i| format!(r#""{}""#, i.product_info().name()))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            };
+            print!("{output}");
+        }
+        Some(Cmd::Info) => info::print(app.name)?,
         Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
-        None => print_info(Some(app.installation()))?,
+        None => info::print(Some(app.installation()))?,
     };
     Ok(())
 }
@@ -170,6 +197,16 @@ enum Cmd {
         subcmd: Option<paths::PathsCmd>,
     },
 
+    /// Select IDE interactively
+    Select {
+        /// Prompt message
+        #[arg(default_value = "Select IDE:")]
+        message: String,
+        /// Allow multi-select
+        #[arg(short, long)]
+        multi: bool,
+    },
+
     /// Print installed RAD Studio product information
     Info,
 
@@ -223,6 +260,10 @@ struct GlobalOptions {
     #[arg(short, long, ignore_case = true, global = true, display_order = 2)]
     platform: Option<Platform>,
 
+    /// Output JSON format data
+    #[arg(long, global = true)]
+    json: bool,
+
     /// No fallback to bds.exe when command-line compilation is unsupported
     #[arg(long, alias = "nobds", global = true)]
     no_bds: bool,
@@ -236,7 +277,7 @@ impl App {
     fn installation(&self) -> &'static Installation {
         *self.installation.get_or_init(|| match self.name {
             Some(i) => i,
-            None => latest_installation().unwrap(),
+            None => &LATEST_INSTALLATION,
         })
     }
 
@@ -338,14 +379,8 @@ impl App {
     }
 }
 
-fn latest_installation() -> anyhow::Result<&'static Installation> {
-    installations()
-        .latest()
-        .context("no RAD Studio installations found")
-}
-
 fn parse_name(name: &str) -> Result<&'static Installation, String> {
-    installations()
+    INSTALLATIONS
         .find_by_name(name)
         .ok_or("no installed RAD Studio matched".to_string())
 }
@@ -356,26 +391,4 @@ fn err_ide_not_installed(arch: &Architecture) -> String {
 
 fn err_clt_not_found(clt: &CommandLineTool) -> String {
     format!("{} not found", clt.file_name())
-}
-
-fn print_installation(installation: &Installation, id: Option<usize>) {
-    id.inspect(|id| print!("{id}. "));
-    println!("{}", installation.product_info().display_name());
-    println!("{}", installation.product_info());
-}
-
-fn print_info(installation: Option<&Installation>) -> anyhow::Result<()> {
-    match installation {
-        Some(i) => print_installation(i, None),
-        None => {
-            if installations().count() <= 1 {
-                print_installation(latest_installation()?, None);
-            } else {
-                for (id, i) in installations().iter().enumerate() {
-                    print_installation(i, Some(id + 1));
-                }
-            }
-        }
-    }
-    Ok(())
 }

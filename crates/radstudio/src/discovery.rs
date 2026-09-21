@@ -1,10 +1,10 @@
 use crate::{bds::Bds, brcc::Brcc, consts, dcc::Dcc, msbuild::MsBuild};
-use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
 use envz::Environment;
 use envz::registry::{HKCU, Node, StringEntry};
+use inquire::{MultiSelect, Select};
 use std::ffi::OsStr;
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     fmt::Display,
     path::{Path, PathBuf},
     str::FromStr,
@@ -12,65 +12,17 @@ use std::{
 };
 use strum::{IntoEnumIterator, VariantArray};
 
-pub struct BTreeSet<T>(std::collections::BTreeSet<T>);
-
-impl<T> BTreeSet<T> {
-    fn new() -> Self {
-        Self(std::collections::BTreeSet::new())
-    }
-}
-
-impl<T: Display> Display for BTreeSet<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{")?;
-        for (i, v) in self.0.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            };
-            write!(f, "{v}")?;
-        }
-        write!(f, "}}")
-    }
-}
-
-impl<T> std::iter::IntoIterator for BTreeSet<T> {
-    type Item = T;
-    type IntoIter = std::collections::btree_set::IntoIter<T>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<T: Ord> std::iter::FromIterator<T> for BTreeSet<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(std::collections::BTreeSet::from_iter(iter))
-    }
-}
-
-impl<T> std::ops::Deref for BTreeSet<T> {
-    type Target = std::collections::BTreeSet<T>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> std::ops::DerefMut for BTreeSet<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[derive(Debug, strum::EnumString)]
+#[derive(Debug, strum::EnumString, serde::Serialize)]
 pub enum Edition {
     #[strum(serialize = "Starter")]
     Community,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, strum::EnumString, strum::Display)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, strum::EnumString, serde::Serialize)]
 pub enum Personality {
-    #[strum(serialize = "Delphi.Win32", to_string = "Delphi")]
+    #[strum(serialize = "Delphi.Win32")]
     Delphi,
-    #[strum(serialize = "BCB", to_string = "C++Builder")]
+    #[strum(serialize = "BCB")]
     CBuilder,
 }
 
@@ -87,7 +39,9 @@ pub type Personalities = BTreeSet<Personality>;
     strum::VariantArray,
     strum::Display,
     clap::ValueEnum,
+    serde::Serialize,
 )]
+#[serde(rename_all = "lowercase")]
 pub enum Architecture {
     /// 32-bit
     #[value(aliases = ["IntelX86", "32bit", "32-bit"])]
@@ -203,7 +157,16 @@ impl CommandLineTool {
 pub type CommandLineTools = BTreeSet<CommandLineTool>;
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter, strum::Display, clap::ValueEnum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::EnumIter,
+    strum::Display,
+    clap::ValueEnum,
+    serde::Serialize,
 )]
 #[value(rename_all = "verbatim")]
 pub enum Platform {
@@ -259,6 +222,7 @@ pub struct ProductInfo {
     supports_command_line_compilation: OnceLock<bool>,
 }
 
+#[radstudio_macros::derive_fn_data]
 impl ProductInfo {
     fn reg_node_with(parent: impl AsRef<Path>, version: impl AsRef<str>) -> envz::Result<Node> {
         HKCU.open(parent.as_ref().join(version.as_ref()).display().to_string())
@@ -438,6 +402,13 @@ impl ProductInfo {
             .collect()
     }
 
+    pub fn ide_platforms(&self) -> Platforms {
+        self.ide_architectures()
+            .iter()
+            .map(|a| a.platform())
+            .collect::<BTreeSet<_>>()
+    }
+
     pub fn supports_command_line_compilation(&self) -> bool {
         *self.supports_command_line_compilation.get_or_init(|| {
             match CommandLineTool::iter().find_map(|t| t.which_dcc(self, &None)) {
@@ -470,109 +441,6 @@ impl ProductInfo {
         CommandLineTool::iter()
             .filter_map(|c| c.path(self, arch).exists().then_some(c))
             .collect()
-    }
-}
-
-impl Display for ProductInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut table = Table::new();
-        table
-            .load_style(UTF8_FULL_CONDENSED)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec!["Property", "Type", "Value"])
-            .add_row(vec!["Known", "Boolean", &self.is_known().to_string()])
-            .add_row(vec!["Version", "String", self.version()])
-            .add_row(vec![
-                "Version Number",
-                "UInt",
-                &self.version_number().to_string(),
-            ])
-            .add_row(vec!["Compiler Version", "String", &self.compiler_version()])
-            .add_row(vec![
-                "Compiler Version Number",
-                "UInt",
-                &self.compiler_version_number().to_string(),
-            ])
-            .add_row(vec!["Package Version", "String", &self.package_version()])
-            .add_row(vec![
-                "Package Version Number",
-                "UInt",
-                &self.package_version_number().to_string(),
-            ])
-            .add_row(vec!["Product Family", "String", self.product_family()])
-            .add_row(vec!["Product Version", "String", &self.product_version()])
-            .add_row(vec!["Product Name", "String", &self.product_name()])
-            .add_row(vec![
-                "Update Number",
-                "UInt",
-                &self.update_number().to_string(),
-            ])
-            .add_row(vec!["Name", "String", &self.name()])
-            .add_row(vec!["Code Name", "String", self.code_name()])
-            .add_row(vec!["Full Name", "String", &self.full_name()])
-            .add_row(vec![
-                "Edition",
-                "Enum",
-                &self
-                    .edition()
-                    .map_or("<Unknown>".to_string(), |e| format!("{e:?}")),
-            ])
-            .add_row(vec!["Display Name", "String", &self.display_name()])
-            .add_row(vec![
-                "Root Dir",
-                "Path",
-                &self.root_dir().display().to_string(),
-            ])
-            .add_row(vec![
-                "Personalities",
-                "Set",
-                &format!("{}", self.personalities()),
-            ])
-            .add_row(vec![
-                "Toolchain Architectures",
-                "Set",
-                &format!("{}", self.architectures()),
-            ])
-            .add_row(vec![
-                "IDE Architectures",
-                "Set",
-                &format!("{}", self.ide_architectures()),
-            ])
-            .add_row(vec!["Platforms", "Set", &format!("{}", self.platforms())])
-            .add_row(vec![
-                "Command-line Compilation",
-                "Boolean",
-                match self.supports_command_line_compilation() {
-                    true => "✅",
-                    false => "🚫",
-                },
-            ]);
-
-        for arch in self.architectures() {
-            let arch_name = format!("{arch}: ");
-            table
-                .add_row(vec![
-                    &format!("{arch_name}Bin Dir"),
-                    "Path",
-                    &self.bin_dir(&arch).display().to_string(),
-                ])
-                .add_row(vec![
-                    &format!("{arch_name}rsvars.bat"),
-                    "Path",
-                    &self.rsvars_bat(&arch).display().to_string(),
-                ])
-                .add_row(vec![
-                    &format!("{arch_name}bds.exe"),
-                    "Path",
-                    &self.bds_exe(&arch).display().to_string(),
-                ])
-                .add_row(vec![
-                    &format!("{arch_name}Command-line Tools"),
-                    "Set",
-                    &format!("{}", self.command_line_tools(&arch)),
-                ]);
-        }
-        writeln!(f, "{table}")
     }
 }
 
@@ -685,8 +553,22 @@ impl Installation {
     }
 }
 
+impl Display for Installation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.product_info().display_name())
+    }
+}
+
 pub struct Installations {
     items: Vec<Installation>,
+}
+
+impl std::ops::Deref for Installations {
+    type Target = Vec<Installation>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
 }
 
 impl Installations {
@@ -725,6 +607,26 @@ impl Installations {
 
     pub fn count(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn select(&self, message: impl AsRef<str>, multi: bool) -> Vec<&Installation> {
+        if self.items.is_empty() {
+            return vec![];
+        }
+
+        let options: Vec<_> = self.items.iter().collect();
+
+        if multi {
+            match MultiSelect::new(message.as_ref(), options).prompt() {
+                Ok(v) => v,
+                _ => vec![],
+            }
+        } else {
+            match Select::new(message.as_ref(), options).prompt() {
+                Ok(v) => vec![v],
+                _ => vec![],
+            }
+        }
     }
 }
 

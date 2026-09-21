@@ -10,7 +10,7 @@ mod discovery;
 pub use discovery::find;
 pub use discovery::{Architecture, Architectures, Platform, Platforms};
 pub use discovery::{CommandLineTool, Edition, Personality};
-pub use discovery::{Installation, Installations};
+pub use discovery::{Installation, Installations, ProductInfo};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
