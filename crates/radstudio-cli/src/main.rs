@@ -293,10 +293,19 @@ impl App {
 
     fn ide_architectures(&self) -> anyhow::Result<Architectures> {
         let ide_archs = self.installation().product_info().ide_architectures();
-        Ok(match &self.global.architecture {
-            Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
-            Some(a) => bail!(err_ide_not_installed(a)),
-            None => ide_archs,
+        Ok(match &self.global.platform {
+            Some(p) if self.global.architecture.is_none() => {
+                let arch = ide_archs
+                    .into_iter()
+                    .find(|a| &a.platform() == p)
+                    .context(format!("{p} does not map to a valid IDE architecture"))?;
+                Architectures::from([arch])
+            }
+            _ => match &self.global.architecture {
+                Some(a) if ide_archs.contains(a) => std::iter::once(a.to_owned()).collect(),
+                Some(a) => bail!(err_ide_not_installed(a)),
+                None => ide_archs,
+            },
         })
     }
 
