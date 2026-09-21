@@ -10,9 +10,9 @@ RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / D
 
 It can drive `MSBuild` to build `.dproj`/`.cbproj` project files as well as `.groupproj` project groups, using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform. 
 
-It can also invoke the Delphi command-line compilers (`DCC32.exe`, `DCC64.exe`, `DCCARM64EC.exe`) directly, compile resource script files, compile, install and register/unregister packages, and read or update the IDE's registry-backed environment variables and search paths.
+It can also invoke the Delphi command-line compilers directly — `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` via the dedicated `dcc32`/`dcc64`/`dccarm64ec` commands, or any of them (including the cross-platform compilers for macOS, Linux, Android, and iOS) via the generic `dcc` command by specifying `-p/--platform` — compile resource script files, compile and register/unregister design-time packages, and read or update the IDE's registry-backed environment variables and search paths. Commands that resolve an IDE architecture (`env`, `env-path`, `library-path`, `browsing-path`, `package`) accept either `-a/--architecture` or `-p/--platform` to pick it.
 
-RAD Studio CLI detects whether the targeted installation actually supports command-line compilation (Community and Trial editions typically don't), and both the `build` command and the direct `dcc32`/`dcc64`/`dccarm64ec` compiler commands automatically fall back to driving `bds.exe` instead when it doesn't — avoiding the "This version of the product does not support command line compiling" prompt without any extra flags.
+RAD Studio CLI detects whether the targeted installation actually supports command-line compilation (Community and Trial editions typically don't), and the `build`, `dcc`/`dcc32`/`dcc64`/`dccarm64ec`, and `package compile` commands automatically fall back to driving `bds.exe` instead when it doesn't — avoiding the "This version of the product does not support command line compiling" prompt without any extra flags.
 
 When building a project group with `bds.exe`, each referenced project is patched and built the same way as if built individually, so options like config, platform, version-info stamping and preferred tool architecture are applied consistently across the whole group.
 
@@ -24,12 +24,13 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 🧭 **Version selection** — target an installation by product name (`RAD Studio 13`), codename (`Florence`, `Rio`, `Berlin`), or product version (`13`, `12`, `XE2`), or default to the latest installed version.
 - 🛠️ **Build via MSBuild** — build `.dproj`/`.cbproj` files, or an entire `.groupproj` project group, with a chosen configuration, architecture, and platform, optionally embedding version-info resources (company name, product version, copyright, etc.) and pinning a preferred 32-bit/64-bit command-line tool architecture. Automatically falls back to `bds.exe` on installations that don't support command-line compiling, unless `--no-bds` is passed.
 - 🧱 **Build via bds.exe** — build the same project or project group files through `bds.exe` instead of MSBuild (same options as `build`), which avoids the "This version of the product does not support command-line compiling" prompt shown by Community/Trial editions. Used automatically as a fallback by `build` and by `dcc32`/`dcc64`/`dccarm64ec`, or invoke it directly with the `bds` command.
-- 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches; falls back to `bds.exe` automatically on editions without command-line compiling support.
-- 🗃️ **Package management** — compile a `.dpk` package for the IDE's own architecture (`package compile`), optionally registering it as a design-time package right after compiling (`--install`), or register/unregister an already-built `.bpl` as a design-time package directly (`package register`/`package unregister`).
+- 🧮 **Direct compiler invocation** — compile Delphi files straight through `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` (`dcc32`/`dcc64`/`dccarm64ec` commands), or any supported target platform — including macOS, Linux, Android, and iOS cross-compilers — via the generic `dcc -p <PLATFORM>` command, with options for conditional defines, unit/resource/include search directories, output directories, and passing through raw compiler switches; falls back to `bds.exe` automatically on editions without command-line compiling support.
+- 🗃️ **Package management** — compile a `.dpk` package for a chosen IDE architecture or platform (`package compile`), optionally registering it as a design-time package right after compiling (`--install`), or register/unregister an already-built `.bpl` as a design-time package directly (`package register`/`package unregister`).
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
 - 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
-- ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, command-line compilation support, and detected command-line compilers.
+- 👉 **Interactive selection** — pick one or more installed IDEs from a fuzzy-searchable prompt with the `select` command, printing their product name(s) (or full details with `--json`) for use in scripts.
+- ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, command-line compilation support, and detected command-line compilers. Available as a formatted table or, with `--json`, as machine-readable JSON.
 - 📌 **Self-install** — add (or remove) the CLI's directory to your user `PATH` so `radstudio` is available from any terminal.
 
 ## Requirements
@@ -74,6 +75,7 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `build` (alias `msbuild`)                    | Build a project file (`*.dproj`, `*.cbproj`, `*.groupproj`) via MSBuild; automatically falls back to `bds.exe` if the installation doesn't support command-line compiling (disable with `--no-bds`) |
 | `bds`                                        | Build a project file via `bds.exe` (same options as `build`); avoids the command-line compiling restriction on Community/Trial editions |
+| `dcc`                                        | Compile Delphi files for a platform given with `-p/--platform` (Win32, Win64, WinARM64EC, or a cross-platform target like OSX64/Linux64/Android64/IOSDevice64) |
 | `dcc32`                                      | Compile Delphi files for Win32 via `DCC32.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
 | `dcc64`                                      | Compile Delphi files for Win64 via `DCC64.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
 | `dccarm64ec`                                 | Compile Delphi files for WinARM64EC via `DCCARM64EC.exe`; falls back to `bds.exe` if command-line compiling is unsupported |
@@ -83,6 +85,7 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | `env-path` (alias `path`)                     | View, add, insert, or remove entries in the IDE environment `PATH`      |
 | `library-path` (aliases `lib-path`, `libpath`) | View, add, insert, or remove entries in the IDE Library path           |
 | `browsing-path`                               | View, add, insert, or remove entries in the IDE Browsing path           |
+| `select`                                     | Interactively pick one (or, with `--multi`, several) installed IDE(s) from a fuzzy-searchable list and print their name(s) |
 | `info`                                       | Print installed RAD Studio product information                          |
 | `self install` / `self uninstall`            | Add or remove this tool from the user `PATH`                            |
 
@@ -91,21 +94,26 @@ Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand pr
 - `env` — `set`/`add <NAME> <VALUE>` to set a variable, `remove`/`rm`/`delete`/`del <NAME>` to remove one.
 - `envpath`, `librarypath`, `browsingpath` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
 
-`dcc32`, `dcc64`, and `dccarm64ec` take a source `<FILE>` plus compiler options: `--no-config` (skip the default `dcc*.cfg`), `-D/--define <NAME>` (repeatable), `--unit-search-dirs`/`--resource-search-dirs`/`--include-search-dirs <DIRS>`, `-B/--build` (rebuild all units), `-Q/--quiet`, `--output-dir`/`--unit-output-dir`/`--package-bpl-output-dir`/`--package-dcp-output-dir <DIR>`, C++Builder-related flags (`--cpp`, `--cpp-win64x`, `--cpp-bpi-output-dir`, `--cpp-hpp-output-dir`, `--cpp-obj-output-dir`), and a trailing `-- <ARGS>` to pass any additional raw compiler switches straight through to the compiler (e.g. `radstudio dcc64 MyProject.dpr -- -W-SYMBOL_DEPRECATED`).
+`env` and `env-path` act on the IDE architecture picked via `-a/--architecture` or `-p/--platform` (e.g. `-p Win64` selects the 64-bit IDE architecture); `library-path` and `browsing-path` are stored per platform and use `-p/--platform` directly.
+
+`dcc32`, `dcc64`, and `dccarm64ec` take a source `<FILE>` plus compiler options: `--no-config` (skip the default `dcc*.cfg`), `-D/--define <NAME>` (repeatable), `--unit-search-dirs`/`--resource-search-dirs`/`--include-search-dirs <DIRS>`, `-B/--build` (rebuild all units), `-Q/--quiet`, `--output-dir`/`--unit-output-dir`/`--package-bpl-output-dir`/`--package-dcp-output-dir <DIR>`, C++Builder-related flags (`--cpp`, `--cpp-win64x`, `--cpp-bpi-output-dir`, `--cpp-hpp-output-dir`, `--cpp-obj-output-dir`), and a trailing `-- <ARGS>` to pass any additional raw compiler switches straight through to the compiler (e.g. `radstudio dcc64 MyProject.dpr -- -W-SYMBOL_DEPRECATED`). `dcc` takes the same options and requires `-p/--platform` to pick which compiler to run.
 
 `package` has three subcommands:
 
-- `package compile <FILE>` — compile a `.dpk` package, using the same compiler options as `dcc32`/`dcc64` (including the `bds.exe` fallback). The compiler is chosen from the current IDE architecture (`-a/--architecture`, or the installation's only IDE architecture if it has just one). Add `--install` to register the freshly built `.bpl` (found via `--package-bpl-output-dir`) as a design-time package immediately after compiling, using the `{$DESCRIPTION '...'}` directive from the source as its description.
-- `package register <BPL_PATH> [DESCRIPTION]` — register an existing `.bpl` as a design-time package for the current IDE architecture.
-- `package unregister <BPL_PATH>` — remove a `.bpl` from the design-time package registry for the current IDE architecture.
+- `package compile <FILE>` — compile a `.dpk` package, using the same compiler options as `dcc32`/`dcc64` (including the `bds.exe` fallback). The compiler is chosen from `-a/--architecture` or `-p/--platform`, or the installation's only IDE architecture if it has just one. Add `--install` to register the freshly built `.bpl` (found via `--package-bpl-output-dir`) as a design-time package immediately after compiling, using the `{$DESCRIPTION '...'}` directive from the source as its description.
+- `package register <BPL_PATH> [DESCRIPTION]` — register an existing `.bpl` as a design-time package for the IDE architecture picked via `-a/--architecture` or `-p/--platform`.
+- `package unregister <BPL_PATH>` — remove a `.bpl` from the design-time package registry for the IDE architecture picked via `-a/--architecture` or `-p/--platform`.
+
+`select [MESSAGE]` shows an interactive, fuzzy-searchable prompt to choose from all detected installations (the message defaults to `Select IDE:`); pass `-m/--multi` to allow choosing more than one. On confirmation it prints the selected product name(s), quoted and space-separated (or, with `--json`, an array of their full `info` data) — handy for feeding into another `radstudio [NAME] ...` invocation from a script.
 
 ### Options
 
 | Option                      | Description                                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `-a, --architecture <ARCH>` | Toolchain/IDE architecture to use, e.g. `IntelX86` (aliases `x86`, `32bit`) or `IntelX64` (aliases `x64`, `64bit`); applies to all commands |
-| `-p, --platform <PLATFORM>` | Target platform, e.g. `Win32`, `Win64`, `Win64x`, `WinARM64EC`, `OSX64`, `OSXARM64`, `Linux64`, `Android32`, `Android64`, `IOSDevice64` |
-| `--no-bds` (alias `--nobds`) | For `build` and `dcc32`/`dcc64`/`dccarm64ec`, disable the automatic fallback to `bds.exe` on installations that don't support command-line compiling |
+| `-p, --platform <PLATFORM>` | Target platform, e.g. `Win32`, `Win64`, `Win64x`, `WinARM64EC`, `OSX64`, `OSXARM64`, `Linux64`, `Android32`, `Android64`, `IOSDevice64`. For `env`/`env-path`/`package`, an alternative to `-a/--architecture` for picking the matching IDE architecture (e.g. `Win64` → 64-bit) |
+| `--json`                    | Print `info` and `select` output as JSON instead of a formatted table/text |
+| `--no-bds` (alias `--nobds`) | For `build`, `dcc`, `dcc32`/`dcc64`/`dccarm64ec`, and `package compile`, disable the automatic fallback to `bds.exe` on installations that don't support command-line compiling |
 | `--no-splash` (aliases `--nosplash`, `--no-logo`, `--nologo`, `--ns`) | Suppress the bds.exe splash screen (when building or falling back to `bds.exe`) or the MSBuild startup logo (`/nologo`) |
 | `-h, --help`                | Print help                                                                                                                                |
 | `-V, --version`             | Print version                                                                                                                             |
@@ -126,6 +134,12 @@ Show details for a specific version (by codename, product name, or number):
 radstudio Florence info
 radstudio 13 info
 radstudio XE2 info
+```
+
+Print installation info as JSON:
+
+```
+radstudio info --json
 ```
 
 Build a project with the latest installed version:
@@ -198,6 +212,12 @@ Compile for WinARM64EC using a specific RAD Studio version, passing raw extra op
 radstudio 13 dccarm64ec MyProject.dpr -- -W-SYMBOL_DEPRECATED
 ```
 
+Compile for a target platform with the generic `dcc` command (here, 64-bit Android):
+
+```
+radstudio dcc MyProject.dpr --platform Android64
+```
+
 Compile on a Community/Trial edition (automatically falls back to `bds.exe`, no extra flags needed):
 
 ```
@@ -216,10 +236,10 @@ Register an already-built `.bpl` as a design-time package:
 radstudio package register "C:\MyPackage\bpl\MyPackage370.bpl" "My custom components"
 ```
 
-Unregister a design-time package:
+Unregister a design-time package for the 64-bit IDE:
 
 ```
-radstudio package unregister "C:\MyPackage\bpl\MyPackage370.bpl" --ide=64bit
+radstudio package unregister "C:\MyPackage\bpl\MyPackage370.bpl" --platform Win64
 ```
 
 Compile a resource script into a `.res` file:
@@ -270,6 +290,18 @@ Insert an entry at the front of the Browsing path:
 radstudio browsingpath insert "C:\MyLib\Include"
 ```
 
+Interactively pick an installed IDE and print its product name:
+
+```
+radstudio select
+```
+
+Pick several IDEs at once, with a custom prompt:
+
+```
+radstudio select "Choose target IDEs:" --multi
+```
+
 ## Project structure
 
 This is a Cargo workspace with three crates:
@@ -278,7 +310,7 @@ This is a Cargo workspace with three crates:
 crates/
 ├── radstudio/           # library crate — registry discovery, product info, tools integration
 ├── radstudio-cli/       # cli crate — the `radstudio` command-line binary
-└── radstudio-macros/    # internal proc-macro crate — generates DCC command-line option tables
+└── radstudio-macros/    # internal proc-macro crate — generates DCC option tables and JSON-serializable data() helpers
 ```
 
 ## Contributing
