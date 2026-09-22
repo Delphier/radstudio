@@ -18,8 +18,8 @@ pub(crate) enum PackageCmd {
     Register {
         /// Specify the full path of the bpl file to register
         bpl_path: PathBuf,
-        /// Specify the description that appears when the package is installed
-        description: Option<String>,
+        /// Specify the description that appears in the registry
+        description: String,
     },
 
     /// Unregister a design-time package
@@ -60,11 +60,7 @@ impl PackageCmd {
             Self::Register {
                 bpl_path,
                 description,
-            } => installation.register_package(
-                arch,
-                bpl_path,
-                description.as_deref().unwrap_or_default(),
-            )?,
+            } => installation.register_package(arch, bpl_path, description)?,
             Self::Unregister { bpl_path } => installation.unregister_pacakge(arch, bpl_path)?,
         }
 
