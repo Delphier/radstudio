@@ -1,6 +1,6 @@
 [package]
 name = "radstudio"
-version = "1.0.0"
+version = "1.0.1"
 edition.workspace = true
 description = "A utility library for the Embarcadero RAD Studio IDE"
 repository = "https://github.com/Delphier/radstudio"
