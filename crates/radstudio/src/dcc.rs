@@ -4,6 +4,7 @@ pub struct Arg {
     pub ident: &'static str,
     pub name: &'static str,
     pub msbuild: &'static str,
+    pub msbuild_value: &'static str,
     pub value: String,
 }
 
@@ -22,6 +23,16 @@ pub struct Options {
     #[dcc(name = "--no-config")]
     #[arg(long)]
     no_config: bool,
+
+    /// Do not output hint messages
+    #[dcc(name = "-H-", msbuild = "DCC_Hints", msbuild_value = "false")]
+    #[arg(long)]
+    no_hints: bool,
+
+    /// Do not output warning messages
+    #[dcc(name = "-W-", msbuild = "DCC_Warnings", msbuild_value = "false")]
+    #[arg(long)]
+    no_warnings: bool,
 
     /// Define conditionals
     #[dcc(name = "-D", msbuild = "DCC_Define")]
@@ -75,8 +86,7 @@ pub struct Options {
     package_dcp_output_dir: Option<String>,
 
     /// Generate all C++Builder files
-    //  MSBuild: <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
-    #[dcc(name = "-JL")]
+    #[dcc(name = "-JL", msbuild = "DCC_CBuilderOutput", msbuild_value = "All")]
     #[arg(long)]
     pub cpp: bool,
 

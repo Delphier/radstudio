@@ -482,7 +482,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radstudio"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "clap",
  "envz",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "radstudio-cli"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "radstudio-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "proc-macro2",
  "quote",

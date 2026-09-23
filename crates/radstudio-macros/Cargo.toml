@@ -1,6 +1,6 @@
 [package]
 name = "radstudio-macros"
-version = "0.2.0"
+version = "0.2.1"
 edition.workspace = true
 description = "Macros for radstudio crate"
 repository = "https://github.com/Delphier/radstudio"

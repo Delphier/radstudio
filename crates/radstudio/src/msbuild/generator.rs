@@ -67,7 +67,9 @@ pub fn generator_project_file(
                 &mut pg_base,
                 arg.msbuild,
                 if arg.is_output_dir() {
-                    absolute_dirs(&curdir, &arg.value)
+                    absolute_dirs(&curdir, arg.value)
+                } else if arg.value.is_empty() {
+                    arg.msbuild_value.to_string()
                 } else {
                     arg.value
                 },
@@ -82,10 +84,6 @@ pub fn generator_project_file(
             absolute_dirs(&curdir, &search_dirs),
         );
     }
-
-    if options.cpp {
-        add_text_element(&mut pg_base, "DCC_CBuilderOutput", "All".to_string());
-    };
 
     if !options.raw.is_empty() {
         add_text_element(

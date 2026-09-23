@@ -18,6 +18,7 @@ pub fn derive_options_data(input: DeriveInput) -> syn::Result<proc_macro2::Token
         let field_name = field_ident.to_string();
         let mut name = String::new();
         let mut msbuild = String::new();
+        let mut msbuild_value = String::new();
 
         attr.parse_nested_meta(|meta| {
             let lit: syn::LitStr = meta.value()?.parse()?;
@@ -25,6 +26,8 @@ pub fn derive_options_data(input: DeriveInput) -> syn::Result<proc_macro2::Token
                 name = lit.value();
             } else if meta.path.is_ident("msbuild") {
                 msbuild = lit.value();
+            } else if meta.path.is_ident("msbuild_value") {
+                msbuild_value = lit.value();
             } else {
                 return Err(meta.error("Unsupported attribute"));
             };
@@ -36,7 +39,7 @@ pub fn derive_options_data(input: DeriveInput) -> syn::Result<proc_macro2::Token
         };
         let ty_name = ty.path.segments.last().unwrap().ident.to_string();
 
-        let arg = quote! {ident: #field_name, name: #name, msbuild: #msbuild};
+        let arg = quote! {ident: #field_name, name: #name, msbuild: #msbuild, msbuild_value: #msbuild_value};
         let block = match ty_name.as_str() {
             "Option" => quote! {
                 if let Some(s) = &self.#field_ident {
