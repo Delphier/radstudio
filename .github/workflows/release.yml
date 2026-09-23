@@ -1,0 +1,51 @@
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+env:
+  BIN_NAME: radstudio-cli
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          # GITHUB_REF = refs/tags/v1.0.0, remove refs/tags/v
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip_filename=$BIN_NAME-$VERSION-x64.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target/release/radstudio.exe" -DestinationPath "${{ steps.version.outputs.zip_filename }}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.version.outputs.zip_filename }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
