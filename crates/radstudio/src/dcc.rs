@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::OnceLock};
+use std::{os::windows::process::CommandExt, path::PathBuf, sync::OnceLock};
 
 pub struct Arg {
     pub ident: &'static str,
@@ -163,7 +163,7 @@ impl Dcc {
                 if arg.value.is_empty() {
                     cmd.arg(&arg.name);
                 } else {
-                    cmd.arg(format!("{}\"{}\"", arg.name, arg.value));
+                    cmd.raw_arg(format!("{}\"{}\"", arg.name, arg.value));
                 }
             }
             if arg.is_output_dir() {
