@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
             app.build_execute(false, options)?;
         }
         Some(Cmd::Dcc { options }) => match &app.global.platform {
-            Some(p) => app.dcc_execute(&p.command_line_tool(), options)?,
+            Some(p) => app.dcc_execute(&p.dcc(), options)?,
             None => bail!("the platform must be specified"),
         },
         Some(Cmd::Dcc32 { options }) => {

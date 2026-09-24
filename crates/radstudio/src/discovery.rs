@@ -195,16 +195,23 @@ pub enum Platform {
 impl Platform {
     pub fn command_line_tool(&self) -> CommandLineTool {
         match self {
-            Platform::Win32 => CommandLineTool::DCC32,
-            Platform::Win64 => CommandLineTool::DCC64,
-            Platform::Win64x => CommandLineTool::BCC64X,
-            Platform::WinARM64EC => CommandLineTool::DCCARM64EC,
-            Platform::OSX64 => CommandLineTool::DCCOSX64,
-            Platform::OSXARM64 => CommandLineTool::DCCOSXARM64,
-            Platform::Linux64 => CommandLineTool::DCCLINUX64,
-            Platform::Android32 => CommandLineTool::DCCAARM,
-            Platform::Android64 => CommandLineTool::DCCAARM64,
-            Platform::IOSDevice64 => CommandLineTool::DCCIOSARM64,
+            Self::Win32 => CommandLineTool::DCC32,
+            Self::Win64 => CommandLineTool::DCC64,
+            Self::Win64x => CommandLineTool::BCC64X,
+            Self::WinARM64EC => CommandLineTool::DCCARM64EC,
+            Self::OSX64 => CommandLineTool::DCCOSX64,
+            Self::OSXARM64 => CommandLineTool::DCCOSXARM64,
+            Self::Linux64 => CommandLineTool::DCCLINUX64,
+            Self::Android32 => CommandLineTool::DCCAARM,
+            Self::Android64 => CommandLineTool::DCCAARM64,
+            Self::IOSDevice64 => CommandLineTool::DCCIOSARM64,
+        }
+    }
+
+    pub fn dcc(&self) -> CommandLineTool {
+        match self {
+            Self::Win64x => CommandLineTool::DCC64,
+            _ => self.command_line_tool(),
         }
     }
 }
