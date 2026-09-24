@@ -10,36 +10,36 @@ mod generator;
 pub use generator::*;
 
 mod consts {
-    pub const EXT_GROUPPROJ: &'static str = "groupproj";
-    pub const EXT_DPROJ: &'static str = "dproj";
-    pub const EXT_CBPROJ: &'static str = "cbproj";
+    pub const EXT_GROUPPROJ: &str = "groupproj";
+    pub const EXT_DPROJ: &str = "dproj";
+    pub const EXT_CBPROJ: &str = "cbproj";
 
-    pub const PROPERTY_GROUP: &'static str = "PropertyGroup";
-    pub const PROPERTY_GROUP_BASE_CONDITION: &'static str = "'$(Base)'!=''";
-    pub const CONDITION: &'static str = "Condition";
+    pub const PROPERTY_GROUP: &str = "PropertyGroup";
+    pub const PROPERTY_GROUP_BASE_CONDITION: &str = "'$(Base)'!=''";
+    pub const CONDITION: &str = "Condition";
 
-    pub const ITEM_GROUP: &'static str = "ItemGroup";
-    pub const PROJECTS: &'static str = "Projects";
-    pub const INCLUDE: &'static str = "Include";
+    pub const ITEM_GROUP: &str = "ItemGroup";
+    pub const PROJECTS: &str = "Projects";
+    pub const INCLUDE: &str = "Include";
 
-    pub const TARGET: &'static str = "Target";
-    pub const NAME: &'static str = "Name";
-    pub const MSBUILD: &'static str = "MSBuild";
-    pub const CALL_TARGET: &'static str = "CallTarget";
-    pub const TARGETS: &'static str = "Targets";
-    pub const BUILD: &'static str = "Build";
+    pub const TARGET: &str = "Target";
+    pub const NAME: &str = "Name";
+    pub const MSBUILD: &str = "MSBuild";
+    pub const CALL_TARGET: &str = "CallTarget";
+    pub const TARGETS: &str = "Targets";
+    pub const BUILD: &str = "Build";
 
-    pub const CONFIG: &'static str = "Config";
-    pub const PLATFORM: &'static str = "Platform";
+    pub const CONFIG: &str = "Config";
+    pub const PLATFORM: &str = "Platform";
 
-    pub const DCC_USE_MSBUILD_EXTERNALLY: &'static str = "DCC_UseMSBuildExternally";
-    pub const DCC_PREFERRED_TOOL_ARCHITECTURE: &'static str = "DCC_PreferredToolArchitecture";
+    pub const DCC_USE_MSBUILD_EXTERNALLY: &str = "DCC_UseMSBuildExternally";
+    pub const DCC_PREFERRED_TOOL_ARCHITECTURE: &str = "DCC_PreferredToolArchitecture";
 
-    pub const VERINFO_INCLUDE_VERINFO: &'static str = "VerInfo_IncludeVerInfo";
-    pub const VERINFO_KEYS: &'static str = "VerInfo_Keys";
+    pub const VERINFO_INCLUDE_VERINFO: &str = "VerInfo_IncludeVerInfo";
+    pub const VERINFO_KEYS: &str = "VerInfo_Keys";
 
-    pub const PRE_BUILD_EVENT: &'static str = "PreBuildEvent";
-    pub const POST_BUILD_EVENT: &'static str = "PostBuildEvent";
+    pub const PRE_BUILD_EVENT: &str = "PreBuildEvent";
+    pub const POST_BUILD_EVENT: &str = "PostBuildEvent";
 }
 use consts::*;
 

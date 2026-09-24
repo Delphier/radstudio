@@ -46,6 +46,11 @@ pub fn derive_options_data(input: DeriveInput) -> syn::Result<proc_macro2::Token
                     result.push(Arg {#arg, value: s.clone()});
                 };
             },
+            "String" => quote! {
+                if !self.#field_ident.is_empty() {
+                  result.push(Arg {#arg, value: self.#field_ident.clone()});
+                };
+            },
             "bool" => quote! {
                 if self.#field_ident {
                     result.push(Arg {#arg, value: String::new()});

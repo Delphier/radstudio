@@ -1,5 +1,8 @@
 use std::{os::windows::process::CommandExt, path::PathBuf, sync::OnceLock};
 
+pub const DEFAULT_ALIAS: &str = "Generics.Collections=System.Generics.Collections;Generics.Defaults=System.Generics.Defaults;WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE";
+pub const DEFAULT_NAMESPACE: &str = "Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;IBX;VclTee";
+
 pub struct Arg {
     pub ident: &'static str,
     pub name: &'static str,
@@ -33,6 +36,16 @@ pub struct Options {
     #[dcc(name = "-W-", msbuild = "DCC_Warnings", msbuild_value = "false")]
     #[arg(long)]
     no_warnings: bool,
+
+    /// Set unit aliases
+    #[dcc(name = "-A", msbuild = "DCC_UnitAlias")]
+    #[arg(long, default_value = DEFAULT_ALIAS)]
+    alias: String,
+
+    /// Set namespace search path (Unit scope names)
+    #[dcc(name = "-NS", msbuild = "DCC_Namespace")]
+    #[arg(long, default_value = DEFAULT_NAMESPACE)]
+    namespace: String,
 
     /// Define conditionals
     #[dcc(name = "-D", msbuild = "DCC_Define")]
@@ -161,12 +174,8 @@ impl Dcc {
     }
 
     pub fn execute(&self, options: &Options) -> std::io::Result<std::process::ExitStatus> {
-        let defaults = [
-            "-AGenerics.Collections=System.Generics.Collections;Generics.Defaults=System.Generics.Defaults;WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE",
-            "-NSWinapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;IBX;VclTee",
-        ];
         let mut cmd = std::process::Command::new(&self.path);
-        cmd.arg(&options.file).args(defaults);
+        cmd.arg(&options.file);
 
         for arg in options.data() {
             if !arg.name.is_empty() {
