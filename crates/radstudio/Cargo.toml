@@ -1,6 +1,6 @@
 [package]
 name = "radstudio"
-version = "1.0.2"
+version = "1.0.3"
 edition.workspace = true
 description = "A utility library for the Embarcadero RAD Studio IDE"
 repository = "https://github.com/Delphier/radstudio"
@@ -9,7 +9,7 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-radstudio-macros = { path = "../radstudio-macros", version = "0.2.1" }
+radstudio-macros = { path = "../radstudio-macros", version = "0.2.2" }
 strum = { version = "0.28.0", features = ["derive"] }
 unicase = "2.9.0"
 tempfile = "3.27.0"
