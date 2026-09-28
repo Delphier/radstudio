@@ -38,7 +38,7 @@ impl PathsCmd {
     }
 }
 
-pub fn print(title: impl AsRef<str>, paths: &Vec<PathBuf>) {
+pub fn print(title: impl AsRef<str>, paths: &[PathBuf]) {
     println!("{}", title.as_ref());
     let mut table = Table::new();
     table

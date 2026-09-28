@@ -180,7 +180,7 @@ impl Dcc {
         for arg in options.data() {
             if !arg.name.is_empty() {
                 if arg.value.is_empty() {
-                    cmd.arg(&arg.name);
+                    cmd.arg(arg.name);
                 } else {
                     cmd.raw_arg(format!("{}\"{}\"", arg.name, arg.value));
                 }

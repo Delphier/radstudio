@@ -34,12 +34,13 @@ fn print_installation(
 ) -> anyhow::Result<()> {
     if json {
         let data = serde_json::to_string_pretty(&vec![installation.product_info().data()?])?;
-        Ok(println!("{data}"))
+        println!("{data}");
     } else {
         id.inspect(|id| print!("{id}. "));
         println!("{}", installation.product_info().display_name());
-        print_product_info(installation.product_info())
+        print_product_info(installation.product_info())?;
     }
+    Ok(())
 }
 
 fn print_product_info(pi: &ProductInfo) -> anyhow::Result<()> {

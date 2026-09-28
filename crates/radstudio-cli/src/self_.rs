@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::Subcommand;
 use std::env::current_exe;
 
-const RAD_STUDIO_CLI: &'static str = "RADStudioCLI";
+const RAD_STUDIO_CLI: &str = "RADStudioCLI";
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum SelfCmd {

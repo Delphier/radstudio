@@ -489,8 +489,7 @@ impl Installation {
     }
 
     pub fn dcc(&self, clt: &CommandLineTool, arch: &Option<Architecture>) -> Option<Dcc> {
-        clt.which_dcc(self.product_info(), arch)
-            .map(|path| Dcc::new(path))
+        clt.which_dcc(self.product_info(), arch).map(Dcc::new)
     }
 
     pub fn dcc32(&self, arch: &Option<Architecture>) -> Option<Dcc> {
@@ -508,7 +507,7 @@ impl Installation {
     pub fn brcc32(&self, arch: &Option<Architecture>) -> Option<Brcc> {
         CommandLineTool::BRCC32
             .which(self.product_info(), arch)
-            .map(|path| Brcc::new(path))
+            .map(Brcc::new)
     }
 
     pub fn environment_variables(&self, arch: &Architecture) -> envz::Result<Environment> {
@@ -616,15 +615,14 @@ impl Installations {
         let options: Vec<_> = self.items.iter().collect();
 
         if multi {
-            match MultiSelect::new(message.as_ref(), options).prompt() {
-                Ok(v) => v,
-                _ => vec![],
-            }
+            MultiSelect::new(message.as_ref(), options)
+                .prompt()
+                .unwrap_or_default()
         } else {
-            match Select::new(message.as_ref(), options).prompt() {
-                Ok(v) => vec![v],
-                _ => vec![],
-            }
+            Select::new(message.as_ref(), options)
+                .prompt()
+                .map(|i| vec![i])
+                .unwrap_or_default()
         }
     }
 }

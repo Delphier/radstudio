@@ -107,7 +107,7 @@ fn main() -> anyhow::Result<()> {
             print!("{output}");
         }
         Some(Cmd::Info) => info::print(app.name, app.global.json)?,
-        Some(Cmd::Self_ { subcmd }) => self_::execute(&subcmd)?,
+        Some(Cmd::Self_ { subcmd }) => self_::execute(subcmd)?,
         None => info::print(Some(app.installation()), app.global.json)?,
     };
     Ok(())
@@ -275,7 +275,7 @@ struct GlobalOptions {
 
 impl App {
     fn installation(&self) -> &'static Installation {
-        *self.installation.get_or_init(|| match self.name {
+        self.installation.get_or_init(|| match self.name {
             Some(i) => i,
             None => &LATEST_INSTALLATION,
         })

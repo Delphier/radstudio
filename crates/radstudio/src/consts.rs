@@ -1,11 +1,11 @@
-pub const SEATTLE: &'static str = "Seattle";
-pub const BERLIN: &'static str = "Berlin";
-pub const TOKYO: &'static str = "Tokyo";
-pub const RIO: &'static str = "Rio";
-pub const SYDNEY: &'static str = "Sydney";
-pub const ALEXANDRIA: &'static str = "Alexandria";
-pub const ATHENS: &'static str = "Athens";
-pub const FLORENCE: &'static str = "Florence";
+pub const SEATTLE: &str = "Seattle";
+pub const BERLIN: &str = "Berlin";
+pub const TOKYO: &str = "Tokyo";
+pub const RIO: &str = "Rio";
+pub const SYDNEY: &str = "Sydney";
+pub const ALEXANDRIA: &str = "Alexandria";
+pub const ATHENS: &str = "Athens";
+pub const FLORENCE: &str = "Florence";
 
 #[derive(Debug)]
 pub(crate) struct VersionInfo {
