@@ -1,5 +1,6 @@
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
-use radstudio::{Installation, Platforms};
+use envz::registry::{Node, StringEntry};
+use radstudio::{Installation, Platform, Platforms};
 use std::{ffi::OsString, path::PathBuf};
 
 #[derive(Debug, clap::Subcommand)]
@@ -16,23 +17,38 @@ pub(crate) enum PathsCmd {
 
 impl PathsCmd {
     pub fn execute(
-        title: impl AsRef<str>,
-        entry: &envz::registry::StringEntry,
         cmd: &Option<Self>,
+        cpp: bool,
         installation: &Installation,
         platforms: Platforms,
+        entry: &envz::registry::StringEntry,
+        title: impl AsRef<str>,
     ) -> envz::Result<()> {
-        for platform in platforms {
-            let node = installation.library(&platform)?;
-            match cmd {
-                Some(Self::Add { item }) => node.paths_push(entry, item)?,
-                Some(Self::Insert { item }) => node.paths_insert(entry, item)?,
-                Some(Self::Remove { item }) => node.paths_remove(entry, item)?,
-                None => print(
-                    format!("{platform} {}", title.as_ref()),
-                    &node.get_paths(entry)?,
-                ),
+        for platform in &platforms {
+            let node = &if cpp {
+                installation.cpp_paths(platform)?
+            } else {
+                installation.library(platform)?
+            };
+            let title = format!("{platform} {}", title.as_ref());
+            if cpp
+                && (platform == &Platform::Win32)
+                && installation.product_info().supports_clang32()
+            {
+                let entry = &StringEntry::new(format!("{}_Clang32", entry.name), false);
+                Self::exec(cmd, node, entry, &format!("{title} (Modern C++ Compiler)"))?;
             }
+            Self::exec(cmd, node, entry, &title)?;
+        }
+        Ok(())
+    }
+
+    fn exec(cmd: &Option<Self>, node: &Node, entry: &StringEntry, title: &str) -> envz::Result<()> {
+        match cmd {
+            Some(Self::Add { item }) => node.paths_push(entry, item)?,
+            Some(Self::Insert { item }) => node.paths_insert(entry, item)?,
+            Some(Self::Remove { item }) => node.paths_remove(entry, item)?,
+            None => print(title, &node.get_paths(entry)?),
         }
         Ok(())
     }

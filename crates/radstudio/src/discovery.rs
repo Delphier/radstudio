@@ -94,8 +94,6 @@ pub enum CommandLineTool {
     DCC32,
     /// RAD Studio Delphi compiler for 64-bit Windows
     DCC64,
-    /// RAD Studio C++ compiler for 64-bit Windows (Modern)
-    BCC64X,
     /// RAD Studio Delphi compiler for 64-bit Windows on ARM (Emulation Compatible)
     DCCARM64EC,
     /// RAD Studio Delphi compiler for 64-bit Intel macOS
@@ -110,6 +108,12 @@ pub enum CommandLineTool {
     DCCAARM64,
     /// RAD Studio Delphi compiler for 64-bit iOS
     DCCIOSARM64,
+    /// RAD Studio C++ compiler for 32-bit Windows (Clang)
+    BCC32C,
+    /// RAD Studio C++ compiler for 32-bit Windows (Clang)
+    BCC32X,
+    /// RAD Studio C++ compiler for 64-bit Windows (Modern)
+    BCC64X,
     /// Resource compiler
     BRCC32,
 }
@@ -150,7 +154,10 @@ impl CommandLineTool {
     }
 
     pub fn platform(&self) -> Option<Platform> {
-        Platform::iter().find(|p| &p.command_line_tool() == self)
+        match self {
+            Self::BCC32C | Self::BCC32X => Some(Platform::Win32),
+            _ => Platform::iter().find(|p| &p.command_line_tool() == self),
+        }
     }
 }
 
@@ -425,6 +432,11 @@ impl ProductInfo {
         })
     }
 
+    pub fn supports_clang32(&self) -> bool {
+        CommandLineTool::BCC32C.which(self, &None).is_some()
+            || CommandLineTool::BCC32X.which(self, &None).is_some()
+    }
+
     pub fn bin_dir(&self, arch: &Architecture) -> PathBuf {
         self.root_dir().join(arch.bin_dir_name())
     }
@@ -518,19 +530,23 @@ impl Installation {
         )
     }
 
-    pub const LIBRARY_PATH: &StringEntry = &StringEntry {
-        name: "Search Path",
-        is_expand: false,
-    };
-    pub const BROWSING_PATH: &StringEntry = &StringEntry {
-        name: "Browsing Path",
-        is_expand: false,
-    };
+    pub const LIBRARY_PATH: &StringEntry = &StringEntry::from_static("Search Path", false);
+    pub const BROWSING_PATH: &StringEntry = &StringEntry::from_static("Browsing Path", false);
 
     pub fn library(&self, platform: &Platform) -> envz::Result<Node> {
         self.product_info()
             .reg_node()?
             .create(format!("Library\\{platform}"))
+    }
+
+    pub const CPP_INCLUDE_PATH: &StringEntry = &StringEntry::from_static("IncludePath", false);
+    pub const CPP_LIBRARY_PATH: &StringEntry = &StringEntry::from_static("LibraryPath", false);
+    pub const CPP_BROWSING_PATH: &StringEntry = &StringEntry::from_static("BrowsingPath", false);
+
+    pub fn cpp_paths(&self, platform: &Platform) -> envz::Result<Node> {
+        self.product_info()
+            .reg_node()?
+            .create(format!("C++\\Paths\\{platform}"))
     }
 
     pub fn known_packages(&self, arch: &Architecture) -> envz::Result<Node> {

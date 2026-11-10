@@ -73,20 +73,52 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Cmd::LibraryPath { subcmd }) => {
             paths::PathsCmd::execute(
-                "Library Path",
-                Installation::LIBRARY_PATH,
                 subcmd,
+                false,
                 app.installation(),
                 app.platforms()?,
+                Installation::LIBRARY_PATH,
+                "Library Path",
             )?;
         }
         Some(Cmd::BrowsingPath { subcmd }) => {
             paths::PathsCmd::execute(
-                "Browsing Path",
-                Installation::BROWSING_PATH,
                 subcmd,
+                false,
                 app.installation(),
                 app.platforms()?,
+                Installation::BROWSING_PATH,
+                "Browsing Path",
+            )?;
+        }
+        Some(Cmd::CppIncludePath { subcmd }) => {
+            paths::PathsCmd::execute(
+                subcmd,
+                true,
+                app.installation(),
+                app.platforms()?,
+                Installation::CPP_INCLUDE_PATH,
+                "C++ Include Path",
+            )?;
+        }
+        Some(Cmd::CppLibraryPath { subcmd }) => {
+            paths::PathsCmd::execute(
+                subcmd,
+                true,
+                app.installation(),
+                app.platforms()?,
+                Installation::CPP_LIBRARY_PATH,
+                "C++ Library Path",
+            )?;
+        }
+        Some(Cmd::CppBrowsingPath { subcmd }) => {
+            paths::PathsCmd::execute(
+                subcmd,
+                true,
+                app.installation(),
+                app.platforms()?,
+                Installation::CPP_BROWSING_PATH,
+                "C++ Browsing Path",
             )?;
         }
         Some(Cmd::Select { message, multi }) => {
@@ -183,16 +215,37 @@ enum Cmd {
         subcmd: Option<paths::PathsCmd>,
     },
 
-    /// Manage IDE library path
+    /// Manage Delphi library path
     #[command(aliases = ["librarypath", "lib-path", "libpath"])]
     LibraryPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
 
-    /// Manage IDE browsing path
+    /// Manage Delphi browsing path
     #[command(alias = "browsingpath")]
     BrowsingPath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
+    },
+
+    /// Manage C++ include path
+    #[command(alias = "cppincludepath")]
+    CppIncludePath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
+    },
+
+    /// Manage C++ library path
+    #[command(aliases = ["cpplibrarypath", "cpp-lib-path", "cpplibpath"])]
+    CppLibraryPath {
+        #[command(subcommand)]
+        subcmd: Option<paths::PathsCmd>,
+    },
+
+    /// Manage C++ browsing path
+    #[command(alias = "cppbrowsingpath")]
+    CppBrowsingPath {
         #[command(subcommand)]
         subcmd: Option<paths::PathsCmd>,
     },
