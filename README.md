@@ -10,7 +10,7 @@ RAD Studio CLI reads the Windows Registry to find every installed RAD Studio / D
 
 It can drive `MSBuild` to build `.dproj`/`.cbproj` project files as well as `.groupproj` project groups, using the correct toolchain environment (`rsvars.bat` / `rsvars64.bat`) for a chosen version, architecture, and platform. 
 
-It can also invoke the Delphi command-line compilers directly — `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` via the dedicated `dcc32`/`dcc64`/`dccarm64ec` commands, or any of them (including the cross-platform compilers for macOS, Linux, Android, and iOS) via the generic `dcc` command by specifying `-p/--platform` — compile resource script files, compile and register/unregister design-time packages, and read or update the IDE's registry-backed environment variables and search paths. Commands that resolve an IDE architecture (`env`, `env-path`, `library-path`, `browsing-path`, `package`) accept either `-a/--architecture` or `-p/--platform` to pick it.
+It can also invoke the Delphi command-line compilers directly — `DCC32.exe`/`DCC64.exe`/`DCCARM64EC.exe` via the dedicated `dcc32`/`dcc64`/`dccarm64ec` commands, or any of them (including the cross-platform compilers for macOS, Linux, Android, and iOS) via the generic `dcc` command by specifying `-p/--platform` — compile resource script files, compile and register/unregister design-time packages, and read or update the IDE's registry-backed environment variables and search paths (the Delphi Library and Browsing paths, plus the C++ Include, Library, and Browsing paths). Commands that resolve an IDE architecture (`env`, `env-path`, `library-path`, `browsing-path`, `cpp-include-path`, `cpp-library-path`, `cpp-browsing-path`, `package`) accept either `-a/--architecture` or `-p/--platform` to pick it.
 
 RAD Studio CLI detects whether the targeted installation actually supports command-line compilation (Community and Trial editions typically don't), and the `build`, `dcc`/`dcc32`/`dcc64`/`dccarm64ec`, and `package compile` commands automatically fall back to driving `bds.exe` instead when it doesn't — avoiding the "This version of the product does not support command line compiling" prompt without any extra flags.
 
@@ -28,7 +28,7 @@ This makes it convenient to build Delphi/C++Builder projects and manage IDE conf
 - 🗃️ **Package management** — compile a `.dpk` package for a chosen IDE architecture or platform (`package compile`), optionally registering it as a design-time package right after compiling (`--install`), or register/unregister an already-built `.bpl` as a design-time package directly (`package register`/`package unregister`).
 - 📦 **Resource compilation** — compile `.rc` resource script files to `.res` via `brcc32.exe`.
 - ⚙️ **IDE environment variables** — view, set, or remove environment variables stored per-architecture for a RAD Studio installation.
-- 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, Library path, and Browsing path, per architecture/platform.
+- 🧩 **Search path management** — view, add, insert, or remove entries in the IDE's environment `PATH`, the Delphi Library and Browsing paths, and the C++ Include, Library, and Browsing paths, per architecture/platform. On Win32, C++ paths for the Modern (Clang-based) C++ compiler are managed alongside the classic ones when the installation provides it.
 - 👉 **Interactive selection** — pick one or more installed IDEs from a fuzzy-searchable prompt with the `select` command, printing their product name(s) (or full details with `--json`) for use in scripts.
 - ℹ️ **Product info** — print detailed information about installed products, including compiler/package versions, edition, personalities (Delphi/C++Builder), root directory, available architectures/platforms, command-line compilation support, and detected command-line compilers. Available as a formatted table or, with `--json`, as machine-readable JSON.
 - 📌 **Self-install** — add (or remove) the CLI's directory to your user `PATH` so `radstudio` is available from any terminal.
@@ -83,18 +83,21 @@ radstudio [NAME] [COMMAND] [OPTIONS]
 | `brcc` (alias `brcc32`)                      | Compile a resource script file (`.rc`) into a `.res` file via `brcc32.exe` |
 | `env`                                        | View, set, or remove IDE environment variables                          |
 | `env-path` (alias `path`)                     | View, add, insert, or remove entries in the IDE environment `PATH`      |
-| `library-path` (aliases `lib-path`, `libpath`) | View, add, insert, or remove entries in the IDE Library path           |
-| `browsing-path`                               | View, add, insert, or remove entries in the IDE Browsing path           |
+| `library-path` (aliases `lib-path`, `libpath`) | View, add, insert, or remove entries in the Delphi Library path        |
+| `browsing-path`                               | View, add, insert, or remove entries in the Delphi Browsing path        |
+| `cpp-include-path` (alias `cppincludepath`)   | View, add, insert, or remove entries in the C++ Include path            |
+| `cpp-library-path` (aliases `cpplibrarypath`, `cpp-lib-path`, `cpplibpath`) | View, add, insert, or remove entries in the C++ Library path |
+| `cpp-browsing-path` (alias `cppbrowsingpath`) | View, add, insert, or remove entries in the C++ Browsing path           |
 | `select`                                     | Interactively pick one (or, with `--multi`, several) installed IDE(s) from a fuzzy-searchable list and print their name(s) |
 | `info`                                       | Print installed RAD Studio product information                          |
 | `self install` / `self uninstall`            | Add or remove this tool from the user `PATH`                            |
 
-Running `env`, `envpath`, `librarypath`, or `browsingpath` with no subcommand prints the current values. Each supports its own subcommands:
+Running `env`, `env-path`, `library-path`, `browsing-path`, `cpp-include-path`, `cpp-library-path`, or `cpp-browsing-path` with no subcommand prints the current values. Each supports its own subcommands:
 
 - `env` — `set`/`add <NAME> <VALUE>` to set a variable, `remove`/`rm`/`delete`/`del <NAME>` to remove one.
-- `envpath`, `librarypath`, `browsingpath` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
+- `env-path`, `library-path`, `browsing-path`, `cpp-include-path`, `cpp-library-path`, `cpp-browsing-path` — `add`/`push`/`append <ITEM>` to append an entry (skipped if it already exists), `insert <ITEM>` to prepend an entry, `remove`/`rm`/`delete`/`del <ITEM>` to remove one.
 
-`env` and `env-path` act on the IDE architecture picked via `-a/--architecture` or `-p/--platform` (e.g. `-p Win64` selects the 64-bit IDE architecture); `library-path` and `browsing-path` are stored per platform and use `-p/--platform` directly.
+`env` and `env-path` act on the IDE architecture picked via `-a/--architecture` or `-p/--platform` (e.g. `-p Win64` selects the 64-bit IDE architecture); `library-path`, `browsing-path`, `cpp-include-path`, `cpp-library-path`, and `cpp-browsing-path` are stored per platform and use `-p/--platform` directly. For the C++ path commands on Win32, if the installation includes the Modern C++ compiler (Clang-based `bcc32c`/`bcc32x`), its separate set of paths is shown or updated as well — printed under an extra `(Modern C++ Compiler)` heading — in addition to the classic compiler's paths.
 
 `dcc32`, `dcc64`, and `dccarm64ec` take a source `<FILE>` plus compiler options: `--no-config` (skip the default `dcc*.cfg`), `-D/--define <NAME>` (repeatable), `--unit-search-dirs`/`--resource-search-dirs`/`--include-search-dirs <DIRS>`, `-B/--build` (rebuild all units), `-Q/--quiet`, `--output-dir`/`--unit-output-dir`/`--package-bpl-output-dir`/`--package-dcp-output-dir <DIR>`, C++Builder-related flags (`--cpp`, `--cpp-win64x`, `--cpp-bpi-output-dir`, `--cpp-hpp-output-dir`, `--cpp-obj-output-dir`), and a trailing `-- <ARGS>` to pass any additional raw compiler switches straight through to the compiler (e.g. `radstudio dcc64 MyProject.dpr -- -W-SYMBOL_DEPRECATED`). `dcc` takes the same options and requires `-p/--platform` to pick which compiler to run.
 
@@ -275,19 +278,37 @@ radstudio env remove MY_VAR
 Append a directory to the IDE's environment `PATH`:
 
 ```
-radstudio envpath add "C:\Tools\bin"
+radstudio env-path add "C:\Tools\bin"
 ```
 
-Show the Library path for a specific platform:
+Show the Delphi Library path for a specific platform:
 
 ```
-radstudio 13 librarypath --platform Win64
+radstudio 13 library-path --platform Win64
 ```
 
-Insert an entry at the front of the Browsing path:
+Insert an entry at the front of the Delphi Browsing path:
 
 ```
-radstudio browsingpath insert "C:\MyLib\Include"
+radstudio browsing-path insert "C:\MyLib\Include"
+```
+
+Show the C++ Include path for a specific platform:
+
+```
+radstudio 13 cpp-include-path --platform Win64
+```
+
+Append a directory to the C++ Library path:
+
+```
+radstudio cpp-library-path add "C:\MyLib\lib" --platform Win64
+```
+
+Remove an entry from the C++ Browsing path:
+
+```
+radstudio cpp-browsing-path remove "C:\MyLib\Include"
 ```
 
 Interactively pick an installed IDE and print its product name:
